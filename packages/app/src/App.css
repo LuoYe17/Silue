@@ -181,6 +181,31 @@ ul {
   overflow-wrap: anywhere;
 }
 
+/* Markdown 渲染出来的段落自己带换行，不能再用 pre-wrap */
+.content.markdown {
+  white-space: normal;
+}
+
+.markdown h1 {
+  font-size: 1.4em;
+}
+
+.markdown h2 {
+  font-size: 1.25em;
+}
+
+.markdown h3 {
+  font-size: 1.1em;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
 .composer {
   display: flex;
   gap: 8px;

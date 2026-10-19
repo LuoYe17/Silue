@@ -69,6 +69,7 @@ Status: implemented
 | Rust 的 tauri | 2.12.4 |
 | Rust 的 tauri-build | 2.7.3 |
 | zod（core） | 4.6.7 |
+| markdown-it（app，2026-10-20 加） | 15.0.2（15.0.3 发布不到一周） |
 | fflate（core） | 0.8.3 |
 | @types/node（core，只给测试用） | 26.6.5 |
 | tauri-plugin-sql（Rust，开 `sqlite` 特性）/ @tauri-apps/plugin-sql | 2.6.0 |

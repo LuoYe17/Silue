@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const doc = (html: string) =>
-  `<!doctype html><meta charset="utf-8"><style>:root{color-scheme:light dark}body{margin:0;display:flow-root;white-space:pre-wrap;overflow-wrap:anywhere}</style><body>${html}`;
+  `<!doctype html><meta charset="utf-8"><style>:root{color-scheme:light dark}body{margin:0;display:flow-root;overflow-wrap:anywhere}body>:first-child{margin-top:0}body>:last-child{margin-bottom:0}h1{font-size:1.4em}h2{font-size:1.25em}h3{font-size:1.1em}</style><body>${html}`;
 
 export function MessageHtml({ html }: { html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);

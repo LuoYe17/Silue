@@ -26,7 +26,11 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
 - 显示：`packages/app/src/App.tsx` 的 `MessageBody` 执行正则后再替换宏（之前开场白里的 `{{user}}` 原样显示，这次一起修了）。正则改出了东西就交给 `MessageHtml.tsx`，没改就按纯文本显示。
   - `MessageHtml` 用 `<iframe sandbox="allow-same-origin" srcdoc=…>`，不给 `allow-scripts`：iframe 里不能跑脚本。给 `allow-same-origin` 只是为了外层能读内容高度，没有脚本权限时 iframe 里的内容用不上这个来源。
   - 外层用 ResizeObserver 盯着 iframe 的 body，展开 `<details>` 时高度跟着变。字体、颜色从外层复制进去。
-  - iframe 的 body 用 `white-space: pre-wrap` 保留换行，代替 SillyTavern 的 Markdown 换行。
+  - 2026-10-20 起，执行完正则再按 Markdown 渲染（顺序和 SillyTavern 一样），用 markdown-it 15.0.2，`breaks: true` 让单个换行也换行（ST 用 showdown 的 `simpleLineBreaks`）。代码在 `packages/app/src/markdown.ts`。
+    - 正则改出了东西的消息：开 HTML 渲染，放进 iframe。
+    - 没改过的消息：关 HTML（原文里的标签被转义），直接放进页面，不建 iframe。
+    - 两种都不渲染链接和图片：链接在主页面里点了会把整个 App 导航走，图片会去加载网络地址。
+    - 打字时不重新渲染所有消息（`MessageBody` 加了 `memo`）。
 - `tauri.conf.json` 加了 `"dangerousDisableAssetCspModification": ["style-src"]`。打包时 Tauri 会往 CSP 里注入哈希（https://v2.tauri.app/security/csp/ ），`style-src` 里有了哈希，`'unsafe-inline'` 就失效，`srcdoc` 的 iframe 继承外层 CSP，卡片的 `style="…"` 全部不生效。只对 `style-src` 关掉注入，`script-src` 照旧。
 
 ## Alternatives considered
@@ -37,6 +41,8 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
 
 ## Consequences
 
+- 2026-10-20 加上 Markdown 后，在真 App 里看：`# 第1章` 显示成标题，`---` 显示成分隔线，万象的状态栏、展开后的人物块和进度条样子不变。203 条的聊天里 101 条 AI 消息进 iframe，102 条用户消息直接渲染。
+
 - 2026-10-19 在真 App 里用开发者的万象卡和从 Tavo 导入的聊天验证（只在本地跑，卡片和聊天含成人内容，不进仓库）：
   - 状态栏、档案、人物折叠块、对话上色、【系统】上色都显示出来了，样子和 Tavo 里一致（只看了截图，没有并排对比）；展开人物块后 iframe 高度从 1802 变成 2114。
   - 往 iframe 里插 `<script>` 和 `<img onerror>` 改标题，都没执行。
@@ -46,7 +52,7 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
   - 打包后的 App 里 CSP 改动是否生效（只在开发模式下跑过，开发模式不加 CSP）。
   - 浅色模式：万象卡的颜色按深色背景写的（状态栏文字是 `#e8e0f0`），浅色模式下看不清，这是卡片的写法问题，没处理。
 - 还没做（代码里有 `shortcut:` 注释）：
-  - Markdown 渲染，`**粗体**`、`# 标题` 原样显示（和这次改动之前一样）。
+  - 中文紧贴标点的粗体（如 `文字**【x】**文字`）按 CommonMark 规则不生效；有需要再加 markdown-it-cjk-friendly。
   - 全局正则、导入 Tavo 导出的正则文件、正则管理界面。
   - 每条消息一个 iframe：203 条的聊天里同时有 101 个，没有测滚动是否卡顿，也没在 iPhone 上试。
   - 卡片里的图片、字体只能从本地加载（CSP 的 `img-src` 没放开网络地址），引用网络图片的卡显示不出图。

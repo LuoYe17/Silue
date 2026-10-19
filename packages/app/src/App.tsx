@@ -40,10 +40,11 @@ import {
   activePath as toActivePath,
   type Usage,
 } from "@silue/core";
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openStore } from "./db.ts";
 import { errorText, t } from "./i18n/index.ts";
 import { MessageHtml } from "./MessageHtml.tsx";
+import { htmlMarkdown, textMarkdown } from "./markdown.ts";
 import {
   deleteProvider,
   EMPTY_FORM,
@@ -164,6 +165,10 @@ export function App() {
   useEffect(() => {
     if (store) void refreshView(store, chatId);
   }, [store, chatId, refreshView]);
+
+  const card = characters.find((c) => c.id === characterId)?.card.data;
+  // 正则表跟着卡片变；稳定的引用让 MessageBody 的 memo 生效，打字时不用重新渲染所有消息
+  const scripts = useMemo(() => (card ? cardRegexScripts(card) : []), [card]);
 
   if (fatal) return <div className="center">{`${t("app.loadFailed")}: ${fatal}`}</div>;
   if (!store) return <div className="center">{t("app.loading")}</div>;
@@ -368,8 +373,6 @@ export function App() {
     });
   };
 
-  const card = characters.find((c) => c.id === characterId)?.card.data;
-  const scripts = card ? cardRegexScripts(card) : [];
   // 生成中只显示到要接回复的那条为止：从中间某条重新生成时，后面的旧消息属于另一条分支
   const shown = streaming
     ? view.messages.slice(0, view.messages.findIndex((m) => m.id === streaming.parentId) + 1)
@@ -771,8 +774,11 @@ export function App() {
   );
 }
 
-/** 显示前先过角色卡里只改显示的正则；改出了 HTML 就放进沙盒 iframe，没改就按纯文本显示 */
-function MessageBody(props: {
+/**
+ * 显示前先过角色卡里只改显示的正则，再按 Markdown 渲染（顺序和 SillyTavern 一样）。
+ * 正则改出了东西就按「认 HTML」渲染、放进沙盒 iframe；没改过的转义 HTML 后直接放进页面。
+ */
+const MessageBody = memo(function MessageBody(props: {
   message: Message;
   depth: number;
   scripts: ReturnType<typeof cardRegexScripts>;
@@ -788,9 +794,12 @@ function MessageBody(props: {
     userName,
   });
   const text = replaceMacros(regexed, charName, userName);
-  return regexed === m.content ? (
-    <div className="content">{text}</div>
-  ) : (
-    <MessageHtml html={text} />
+  if (regexed !== m.content) return <MessageHtml html={htmlMarkdown.render(text)} />;
+  return (
+    <div
+      className="content markdown"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: textMarkdown 关了 HTML，原文里的标签会被转义
+      dangerouslySetInnerHTML={{ __html: textMarkdown.render(text) }}
+    />
   );
-}
+});
