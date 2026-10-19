@@ -3,7 +3,7 @@
 // 不变的系统提示、角色卡、常驻世界书在最前，聊天记录只往后追加，
 // 每轮会变的（触发的世界书、post_history_instructions）放在聊天记录之后。
 // 聊天记录先过角色卡自带的正则（只改提示词的和两处都改的），再替换 {{char}}、{{user}}。
-// shortcut: 还没有预设、用户人设，导入预设时换成按预设条目拼装
+// shortcut: 还没有预设，导入预设时换成按预设条目拼装
 import type { CardData } from "../card/schema.ts";
 import type { Role } from "../chat/tree.ts";
 import type { ChatMessage } from "../llm/openai.ts";
@@ -17,6 +17,8 @@ export const DEFAULT_MAIN_PROMPT =
 export interface ChatPromptInput {
   card: CardData;
   userName: string;
+  /** 用户人设的描述，没有就不放 */
+  persona?: string;
   /** 从开场白到最后一条，按顺序 */
   history: { role: Role; content: string }[];
   /** 世界书条目按概率触发时抽签用，测试里传固定值 */
@@ -33,6 +35,7 @@ export function replaceMacros(text: string, charName: string, userName: string):
 export function buildChatPrompt({
   card,
   userName,
+  persona = "",
   history,
   random,
 }: ChatPromptInput): ChatMessage[] {
@@ -45,6 +48,8 @@ export function buildChatPrompt({
   const system = [
     main,
     ...lore.before,
+    // 位置照 SillyTavern 默认顺序（PromptManager.js 的 promptManagerDefaultPromptOrder）：世界书 before 之后、角色描述之前
+    persona,
     card.description,
     card.personality.trim() && `{{char}}'s personality: ${card.personality}`,
     card.scenario.trim() && `Scenario: ${card.scenario}`,

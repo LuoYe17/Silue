@@ -4,8 +4,8 @@ import type { DocStore } from "../store/doc-store.ts";
 import { THINKING_LEVELS, type ThinkingLevel } from "./thinking.ts";
 
 export const PROVIDERS = "providers";
-const SETTINGS = "settings";
-const APP_SETTINGS = "app";
+export const SETTINGS = "settings";
+export const APP_SETTINGS = "app";
 
 export interface ProviderProfileData {
   [key: string]: unknown;

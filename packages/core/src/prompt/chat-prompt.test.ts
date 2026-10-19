@@ -80,6 +80,19 @@ describe("buildChatPrompt", () => {
     expect(messages[0]?.content).not.toContain("personality");
   });
 
+  test("用户人设放在角色描述前面，里面的宏也替换", () => {
+    const [system] = buildChatPrompt({
+      card,
+      userName: "阿叶",
+      persona: "{{user}} 是书店的店员，对猫过敏。",
+      history: [],
+    });
+    expect(system?.content.split("\n\n").slice(1, 3)).toEqual([
+      "阿叶 是书店的店员，对猫过敏。",
+      "小橘 是一只住在书店的橘猫，喜欢趴在 阿叶 的键盘上。",
+    ]);
+  });
+
   test("宏不区分大小写，V1 的 <BOT> <USER> 也换", () => {
     expect(replaceMacros("{{Char}} <BOT> {{USER}} <user>", "猫", "人")).toBe("猫 猫 人 人");
   });

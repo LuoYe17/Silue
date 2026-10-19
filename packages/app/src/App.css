@@ -220,7 +220,8 @@ ul {
   color: var(--muted);
 }
 
-.settings input {
+.settings input,
+.settings textarea {
   font: inherit;
   color: var(--text);
   background: var(--bg);

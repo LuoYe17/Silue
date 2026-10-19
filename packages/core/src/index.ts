@@ -6,6 +6,7 @@ export const APP_NAME = "Silue";
 export * from "./card/import.ts";
 export * from "./card/schema.ts";
 export * from "./chat/import-st.ts";
+export * from "./chat/persona.ts";
 export * from "./chat/repo.ts";
 export * from "./chat/tree.ts";
 export * from "./llm/openai.ts";

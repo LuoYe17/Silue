@@ -19,10 +19,13 @@ import {
   listCharacters,
   listChats,
   loadChat,
+  loadPersona,
   type Message,
+  type Persona,
   type ProviderProfile,
   reasoningEffort,
   replaceMacros,
+  savePersona,
   selectBranch,
   setActiveProviderProfile,
   siblingsOf,
@@ -68,6 +71,11 @@ export function App() {
   const [deletingProvider, setDeletingProvider] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  /** 已保存的人设；personaForm 是面板里正在改的 */
+  const [persona, setPersona] = useState<Persona>({ name: "", description: "" });
+  const [personaForm, setPersonaForm] = useState<Persona>(persona);
+  const [personaOpen, setPersonaOpen] = useState(false);
+  const [personaSaved, setPersonaSaved] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
   const [editing, setEditing] = useState<{ id: string; text: string }>();
   const [deleting, setDeleting] = useState<string>();
@@ -123,6 +131,13 @@ export function App() {
     if (!store) return;
     void refreshCharacters(store);
     refreshProviders(store).catch((err) => setError(errorText(err)));
+    loadPersona(store).then(
+      (p) => {
+        setPersona(p);
+        setPersonaForm(p);
+      },
+      (err) => setError(errorText(err)),
+    );
   }, [store, refreshCharacters, refreshProviders]);
   useEffect(() => {
     if (store) void refreshChats(store, characterId);
@@ -147,9 +162,12 @@ export function App() {
     ]);
     if (!loaded || !character) return;
     const path = toActivePath(buildTree(loaded.messages), parentId);
-    // shortcut: 还没有用户人设，用户名取这段聊天里最后一条用户消息的名字，做人设时改成读人设
-    const userName = path.findLast((m) => m.role === "user")?.name ?? t("chat.you");
-    const messages = buildChatPrompt({ card: character.data, userName, history: path });
+    const messages = buildChatPrompt({
+      card: character.data,
+      userName: userNameOf(path),
+      persona: persona.description,
+      history: path,
+    });
 
     const controller = new AbortController();
     abort.current = controller;
@@ -222,11 +240,10 @@ export function App() {
     if (!content || !chatId || streaming) return;
     void run(async () => {
       const last = view.messages[view.messages.length - 1];
-      const lastUser = view.messages.findLast((m) => m.role === "user");
       const sent = await appendMessage(store, chatId, {
         parentId: last?.id ?? null,
         role: "user",
-        name: lastUser?.name ?? t("chat.you"),
+        name: userNameOf(view.messages),
         content,
       });
       setDraft("");
@@ -268,6 +285,20 @@ export function App() {
     void run(async () => {
       await selectBranch(store, chatId, target.id);
       await refreshView(store, chatId);
+    });
+  };
+
+  /** {{user}} 用人设的名字；没填时沿用这段聊天里最后一条用户消息的名字（导入的 ST 聊天带名字） */
+  const userNameOf = (path: Message[]) =>
+    persona.name || path.findLast((m) => m.role === "user")?.name || t("chat.you");
+
+  const onSavePersona = () => {
+    void run(async () => {
+      await savePersona(store, personaForm);
+      const saved = await loadPersona(store);
+      setPersona(saved);
+      setPersonaForm(saved);
+      setPersonaSaved(true);
     });
   };
 
@@ -435,6 +466,45 @@ export function App() {
               ))}
           </form>
         )}
+        <button
+          type="button"
+          className="item settings-toggle"
+          onClick={() => {
+            setPersonaOpen(!personaOpen);
+            setPersonaSaved(false);
+          }}
+        >
+          {t("persona.title")}
+        </button>
+        {personaOpen && (
+          <form
+            className="settings"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSavePersona();
+            }}
+          >
+            <label>
+              {t("persona.name")}
+              <input
+                value={personaForm.name}
+                onChange={(e) => setPersonaForm({ ...personaForm, name: e.target.value })}
+              />
+            </label>
+            <label>
+              {t("persona.description")}
+              <textarea
+                rows={6}
+                value={personaForm.description}
+                onChange={(e) => setPersonaForm({ ...personaForm, description: e.target.value })}
+              />
+            </label>
+            <button type="submit" className="button">
+              {t("settings.save")}
+            </button>
+            {personaSaved && <span className="hint">{t("settings.saved")}</span>}
+          </form>
+        )}
       </aside>
 
       <aside className="pane">
@@ -569,7 +639,7 @@ export function App() {
                     depth={shown.length - 1 - i}
                     scripts={scripts}
                     charName={card?.name ?? m.name}
-                    userName={shown.findLast((x) => x.role === "user")?.name ?? t("chat.you")}
+                    userName={userNameOf(shown)}
                   />
                 )}
                 {usage && (
