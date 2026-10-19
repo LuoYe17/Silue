@@ -13,7 +13,7 @@ Status: proposed
 - **笔记**：
   - 重要改动按 `.agents/skills/write-notes-like-deepseek/` 的规范写进 `.agents/notes/`。
   - `npm run verify-notes` 用 Node 24 直接运行技能里的 `.ts` 脚本，不需要 tsx。
-  - CI 配置在 `.github/workflows/verify-notes.yml`。
+  - CI 配置在 `.github/workflows/ci.yml`，每次提交都检查的那部分已经落地，见 [工具链](../../implemented/process/2026-10-19-monorepo-toolchain.md)。
 - **发版**：
   - 版本号用「主版本.次版本.修订号」（比如 1.2.0）。
   - 打 tag 时，GitHub Actions 出 Windows 安装包和不签名的 iOS ipa，自动生成更新说明，一起放进 GitHub Releases。

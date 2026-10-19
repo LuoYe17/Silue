@@ -21,7 +21,7 @@ Silue 是一个 RP 聊天客户端，第一版只做 Windows 和 iOS。下面这
   - `worker`：Cloudflare Worker 和 Durable Object，用于同步和后台代跑
   - `core`：纯 TypeScript 的核心逻辑，不依赖界面和 Tauri，可以单独测试。包括角色卡和世界书解析、提示词拼装、各家模型适配、记忆、同步协议、加密
 
-  `core` 同时给 `app` 和 `worker` 用。
+  `core` 同时给 `app` 和 `worker` 用。目录结构和检查工具已经搭好，见 [工具链](../../implemented/process/2026-10-19-monorepo-toolchain.md)。
 - **iOS 出包**：在 GitHub Actions 的 macOS 机器上跑 `xcodebuild archive`，带 `CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO`，把 `.app` 放进 `Payload/` 后压缩成 `.ipa`，再由开发者在手机上重签（通用做法见 https://git.tdem.in/MrKai77/Export-unsigned-ipa-files ）。
 - **平台范围**：
   - Windows 10 及以上（Tauri 依赖系统的 WebView2）。

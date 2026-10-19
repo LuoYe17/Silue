@@ -1,0 +1,19 @@
+[package]
+name = "silue"
+version = "0.1.0"
+description = "AI roleplay chat client"
+license = "AGPL-3.0-only"
+repository = "https://github.com/LuoYe17/Silue"
+edition = "2024"
+rust-version = "1.90"
+
+[lib]
+# 后缀 _lib 避免和 bin 同名，Windows 上同名会导致 cargo 冲突；staticlib/cdylib 给 iOS/Android 用
+name = "silue_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.4", features = [] }
