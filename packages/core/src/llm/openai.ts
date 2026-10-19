@@ -65,7 +65,25 @@ export function chatCompletionsUrl(baseUrl: string): string {
   return `${/^https?:\/\/[^/]+$/i.test(base) ? `${base}/v1` : base}/chat/completions`;
 }
 
-export function openAiChatRequest(config: ProviderConfig, messages: ChatMessage[]): HttpRequest {
+/** 采样参数，来自预设；没有的字段不发 */
+export interface Sampling {
+  temperature?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  maxTokens?: number;
+}
+
+export function openAiChatRequest(
+  config: ProviderConfig,
+  messages: ChatMessage[],
+  sampling: Sampling = {},
+): HttpRequest {
+  const { maxTokens, ...rest } = sampling;
+  // OpenAI 官方的推理模型不认 max_tokens，要用 max_completion_tokens（https://platform.openai.com/docs/api-reference/chat/create ）
+  const maxField = /^https?:\/\/api\.openai\.com(\/|$)/i.test(config.baseUrl.trim())
+    ? "max_completion_tokens"
+    : "max_tokens";
   return {
     url: chatCompletionsUrl(config.baseUrl),
     headers: {
@@ -79,6 +97,8 @@ export function openAiChatRequest(config: ProviderConfig, messages: ChatMessage[
       stream_options: { include_usage: true },
       // 放在最后：不改前面字段的顺序，default 时请求体和以前逐字相同
       reasoning_effort: reasoningEffort(config.baseUrl, config.thinking ?? "default"),
+      ...rest,
+      ...(maxTokens !== undefined && { [maxField]: maxTokens }),
     }),
   };
 }

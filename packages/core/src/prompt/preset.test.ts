@@ -11,6 +11,8 @@ import {
   movedPresetPrompts,
   PresetImportError,
   parseStPreset,
+  presetSampling,
+  removePreset,
   setActivePreset,
 } from "./preset.ts";
 
@@ -191,6 +193,21 @@ describe("SillyTavern 预设", () => {
     expect(b.slice(0, 3)).toEqual(a.slice(0, 3));
   });
 
+  test("采样参数：只取认识的几个，写错类型的不发", () => {
+    expect(presetSampling(preset)).toEqual({ temperature: 1 });
+    expect(
+      presetSampling(
+        parseStPreset({
+          ...raw,
+          temperature: "热",
+          top_p: 0.9,
+          openai_max_tokens: 8192,
+          top_k: 40,
+        }),
+      ),
+    ).toEqual({ top_p: 0.9, maxTokens: 8192 });
+  });
+
   test("不是预设的 JSON 报错", () => {
     expect(() => parseStPreset({ name: "小橘", first_mes: "喵" })).toThrow(PresetImportError);
   });
@@ -205,6 +222,10 @@ describe("SillyTavern 预设", () => {
     await setActivePreset(store, id);
     expect((await activePreset(store))?.preset.personality_format).toBe(raw.personality_format);
     await setActivePreset(store, "");
+    expect(await activePreset(store)).toBeUndefined();
+    await setActivePreset(store, id);
+    await removePreset(store, id);
+    expect(await listPresets(store)).toEqual([]);
     expect(await activePreset(store)).toBeUndefined();
   });
 });

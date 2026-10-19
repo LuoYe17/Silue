@@ -41,6 +41,10 @@ export const en: Record<MessageKey, string> = {
   "preset.import": "Import SillyTavern preset",
   "preset.moved":
     "These depth entries were moved after the chat history so the cache hits more often: {names}",
+  "preset.sampling": "Sampling sent to the API: {values}",
+  "preset.noSampling": "No sampling settings in this preset; the API defaults apply",
+  "preset.delete": "Delete this preset",
+  "preset.confirmDelete": "Confirm delete",
   "settings.title": "Model settings",
   "settings.profile": "Profile",
   "settings.newProfile": "+ New profile",

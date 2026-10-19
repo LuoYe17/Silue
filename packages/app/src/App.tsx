@@ -28,8 +28,11 @@ import {
   type Persona,
   type PresetItem,
   type ProviderProfile,
+  presetSampling,
   reasoningEffort,
+  removePreset,
   replaceMacros,
+  type Sampling,
   savePersona,
   selectBranch,
   setActivePreset,
@@ -85,8 +88,9 @@ export function App() {
   const [personaSaved, setPersonaSaved] = useState(false);
   const [presets, setPresets] = useState<PresetItem[]>([]);
   /** 当前选中的预设和它被挪到聊天记录之后的条目名 */
-  const [preset, setPreset] = useState<{ id: string; moved: string[] }>();
+  const [preset, setPreset] = useState<{ id: string; moved: string[]; sampling: Sampling }>();
   const [presetOpen, setPresetOpen] = useState(false);
+  const [deletingPreset, setDeletingPreset] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
   const [editing, setEditing] = useState<{ id: string; text: string }>();
   const [deleting, setDeleting] = useState<string>();
@@ -134,8 +138,13 @@ export function App() {
     const [list, active] = await Promise.all([listPresets(s), activePreset(s)]);
     setPresets(list);
     setPreset(
-      active && { id: active.id, moved: movedPresetPrompts(active.preset).map((p) => p.name) },
+      active && {
+        id: active.id,
+        moved: movedPresetPrompts(active.preset).map((p) => p.name),
+        sampling: presetSampling(active.preset),
+      },
     );
+    setDeletingPreset(false);
   }, []);
 
   const refreshProviders = useCallback(async (s: DocStore) => {
@@ -201,7 +210,8 @@ export function App() {
     let usage: Usage | undefined;
     setStreaming({ ...state });
     try {
-      await streamChat(provider, messages, controller.signal, (event) => {
+      const sampling = active ? presetSampling(active.preset) : {};
+      await streamChat(provider, messages, sampling, controller.signal, (event) => {
         if (event.type === "text") state.text += event.text;
         else if (event.type === "reasoning") state.reasoning += event.text;
         else if (event.type === "usage") usage = event.usage;
@@ -266,6 +276,14 @@ export function App() {
   const onPickPreset = (id: string) => {
     void run(async () => {
       await setActivePreset(store, id);
+      await refreshPresets(store);
+    });
+  };
+
+  const onDeletePreset = (id: string) => {
+    void run(async () => {
+      await removePreset(store, id);
+      await setActivePreset(store, "");
       await refreshPresets(store);
     });
   };
@@ -570,6 +588,40 @@ export function App() {
             {preset && preset.moved.length > 0 && (
               <span className="hint">{t("preset.moved", { names: preset.moved.join("、") })}</span>
             )}
+            {preset && (
+              <span className="hint">
+                {Object.keys(preset.sampling).length > 0
+                  ? t("preset.sampling", {
+                      values: Object.entries(preset.sampling)
+                        .map(([k, v]) => `${k === "maxTokens" ? "max_tokens" : k}: ${v}`)
+                        .join(", "),
+                    })
+                  : t("preset.noSampling")}
+              </span>
+            )}
+            {preset &&
+              (deletingPreset ? (
+                <span className="actions">
+                  <button
+                    type="button"
+                    className="link danger"
+                    onClick={() => onDeletePreset(preset.id)}
+                  >
+                    {t("preset.confirmDelete")}
+                  </button>
+                  <button type="button" className="link" onClick={() => setDeletingPreset(false)}>
+                    {t("chat.cancel")}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="link danger"
+                  onClick={() => setDeletingPreset(true)}
+                >
+                  {t("preset.delete")}
+                </button>
+              ))}
             <label className="button">
               {t("preset.import")}
               <input type="file" accept=".json" hidden onChange={onImportPreset} />

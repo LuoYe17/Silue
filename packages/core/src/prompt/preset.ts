@@ -2,10 +2,11 @@
 // 拼装规则照 ST（public/scripts/openai.js、PromptManager.js），只有一处不同：
 // 带深度的条目（injection_position 1）ST 插进聊天记录中间，这里一律挪到聊天记录之后，
 // 原位置每轮都变会打断缓存（.agents/notes/proposed/feature/2026-10-19-prompt-cache-layout.md）。预设原文不改，原位置还在条目上。
-// shortcut: 不支持预设里的温度等采样参数、续写 / 代写提示、宏 {{random}} 之类，做预设编辑界面时一起做
+// 采样参数只取 OpenAI 规格里有的几个（温度、top_p、两个惩罚、最大长度），top_k、min_p 这类不发。
+// shortcut: 不支持续写 / 代写提示、宏 {{random}} 之类，做预设编辑界面时一起做
 import { z } from "zod";
 import type { CardData } from "../card/schema.ts";
-import type { ChatMessage } from "../llm/openai.ts";
+import type { ChatMessage, Sampling } from "../llm/openai.ts";
 import { APP_SETTINGS, SETTINGS } from "../llm/profiles.ts";
 import type { DocStore } from "../store/doc-store.ts";
 import type { ActiveLore } from "./lorebook.ts";
@@ -39,6 +40,14 @@ const num = (fallback: number) =>
     .nullish()
     .catch(fallback)
     .transform((v) => v ?? fallback);
+
+/** 采样参数：缺了、写成 null 或者不是数字的，都当作没写（不发给接口） */
+const optionalNum = () =>
+  z
+    .number()
+    .nullish()
+    .catch(undefined)
+    .transform((v) => v ?? undefined);
 
 const promptSchema = z.looseObject({
   identifier: z.string(),
@@ -74,6 +83,11 @@ export const stPresetSchema = z.looseObject({
   wi_format: text("{0}"),
   scenario_format: text("{{scenario}}"),
   personality_format: text("{{personality}}"),
+  temperature: optionalNum(),
+  top_p: optionalNum(),
+  frequency_penalty: optionalNum(),
+  presence_penalty: optionalNum(),
+  openai_max_tokens: optionalNum(),
 });
 export type StPreset = z.infer<typeof stPresetSchema>;
 
@@ -81,6 +95,20 @@ export function parseStPreset(json: unknown): StPreset {
   const parsed = stPresetSchema.safeParse(json);
   if (!parsed.success) throw new PresetImportError("invalid_preset", parsed.error.message);
   return parsed.data;
+}
+
+/** 预设里的采样参数，没写的不放 */
+export function presetSampling(preset: StPreset): Sampling {
+  const { temperature, top_p, frequency_penalty, presence_penalty, openai_max_tokens } = preset;
+  return Object.fromEntries(
+    Object.entries({
+      temperature,
+      top_p,
+      frequency_penalty,
+      presence_penalty,
+      maxTokens: openai_max_tokens,
+    }).filter(([, v]) => v !== undefined),
+  );
 }
 
 /** 预设里生效的顺序：优先全局顺序，没有就用第一份，再没有就按 prompts 的顺序全部启用 */
@@ -265,6 +293,10 @@ export async function activePreset(
   const doc = await store.get<PresetDoc>(PRESETS, id);
   if (!doc) return undefined;
   return { id, name: String(doc.data.name ?? ""), preset: parseStPreset(doc.data.preset) };
+}
+
+export async function removePreset(store: DocStore, id: string): Promise<void> {
+  await store.remove(PRESETS, id);
 }
 
 /** 传空字符串表示不用预设 */

@@ -58,6 +58,22 @@ describe("openAiChatRequest", () => {
     // 有意改请求内容时，跑 npm test -- -u 更新，并在提交里写明原因
     await expect(golden).toMatchFileSnapshot("./__golden__/openai-chat-request.txt");
   });
+
+  test("采样参数接在最后；最大长度在 OpenAI 官方叫 max_completion_tokens", () => {
+    const body = (baseUrl: string) =>
+      JSON.parse(
+        openAiChatRequest({ baseUrl, apiKey: "k", model: "m" }, [], {
+          temperature: 0.8,
+          maxTokens: 8192,
+        }).body,
+      );
+    expect(Object.keys(body("https://api.deepseek.com")).slice(-2)).toEqual([
+      "temperature",
+      "max_tokens",
+    ]);
+    expect(body("https://api.openai.com/v1")).toMatchObject({ max_completion_tokens: 8192 });
+    expect(body("https://api.openai.com.relay.example")).toMatchObject({ max_tokens: 8192 });
+  });
 });
 
 describe("流式解析", () => {

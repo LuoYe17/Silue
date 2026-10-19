@@ -12,6 +12,7 @@ import {
   parseOpenAiEvent,
   providerHttpError,
   removeProviderProfile,
+  type Sampling,
   SseDecoder,
   type StreamEvent,
   saveProviderProfile,
@@ -107,10 +108,11 @@ export const isProviderReady = (c: ProviderConfig) => Boolean(c.baseUrl && c.mod
 export async function streamChat(
   config: ProviderConfig,
   messages: ChatMessage[],
+  sampling: Sampling,
   signal: AbortSignal,
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
-  const request = openAiChatRequest(config, messages);
+  const request = openAiChatRequest(config, messages, sampling);
   const response = await fetch(request.url, {
     method: "POST",
     headers: request.headers,
