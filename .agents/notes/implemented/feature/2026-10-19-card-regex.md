@@ -25,7 +25,7 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
 - 拼提示词：`buildChatPrompt` 先对聊天记录执行正则，再替换宏。世界书关键词仍然扫原文。
 - 显示：`packages/app/src/App.tsx` 的 `MessageBody` 执行正则后再替换宏（之前开场白里的 `{{user}}` 原样显示，这次一起修了）。正则改出了东西就交给 `MessageHtml.tsx`，没改就按纯文本显示。
   - `MessageHtml` 用 `<iframe sandbox="allow-same-origin" srcdoc=…>`，不给 `allow-scripts`：iframe 里不能跑脚本。给 `allow-same-origin` 只是为了外层能读内容高度，没有脚本权限时 iframe 里的内容用不上这个来源。
-  - 外层用 ResizeObserver 盯着 iframe 的 body，展开 `<details>` 时高度跟着变。字体、颜色从外层复制进去。
+  - 外层用 ResizeObserver 盯着 iframe 的 body，展开 `<details>` 时高度跟着变。字体从外层复制进去；文字颜色靠 iframe 里的 `color-scheme: light dark` 跟系统深浅色走（2026-10-20 改，之前复制外层颜色，切换深浅色后旧 iframe 还是旧颜色）。
   - 2026-10-20 起，执行完正则再按 Markdown 渲染（顺序和 SillyTavern 一样），用 markdown-it 15.0.2，`breaks: true` 让单个换行也换行（ST 用 showdown 的 `simpleLineBreaks`）。代码在 `packages/app/src/markdown.ts`。
     - 正则改出了东西的消息：开 HTML 渲染，放进 iframe。
     - 没改过的消息：关 HTML（原文里的标签被转义），直接放进页面，不建 iframe。

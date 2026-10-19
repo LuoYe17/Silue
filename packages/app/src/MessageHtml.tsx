@@ -37,10 +37,8 @@ export function MessageHtml({ html }: { html: string }) {
     const iframe = frame.current;
     const body = iframe?.contentDocument?.body;
     if (!iframe || !body) return;
-    // 字体和颜色跟外面的消息一致
-    const style = getComputedStyle(iframe);
-    body.style.font = style.font;
-    body.style.color = style.color;
+    // 字体跟外面的消息一致；文字颜色不复制，靠 color-scheme 跟系统深浅色走，切换深浅色时不用重建
+    body.style.font = getComputedStyle(iframe).font;
     observer.current?.disconnect();
     // 展开、收起 <details> 时高度会变
     observer.current = new ResizeObserver(() =>

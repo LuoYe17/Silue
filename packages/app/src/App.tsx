@@ -1,4 +1,5 @@
-// 最简界面：用来在真 App 里把存储层和模型调用跑一遍（导入卡、导入聊天、发消息、生成回复、切换备选）。
+// 主界面：左边是导航栏（角色 → 这个角色的聊天，像 iOS 一样点进去、返回），右边是聊天。
+// 窄屏（手机）上两边不同时显示：打开聊天时只显示聊天，左上角返回。设置是弹出页（SettingsSheet）。
 import {
   activePreset,
   appendMessage,
@@ -15,48 +16,38 @@ import {
   editMessage,
   getCharacter,
   importCard,
-  importPreset,
   importStChat,
   importStChatToStore,
   listCharacters,
   listChats,
-  listPresets,
   loadChat,
   loadPersona,
   type Message,
-  movedPresetPrompts,
   type Persona,
-  type PresetItem,
-  type ProviderProfile,
   presetSampling,
-  reasoningEffort,
-  removePreset,
   replaceMacros,
-  type Sampling,
-  savePersona,
   selectBranch,
-  setActivePreset,
-  setActiveProviderProfile,
   siblingsOf,
-  THINKING_LEVELS,
-  type ThinkingLevel,
   activePath as toActivePath,
   type Usage,
 } from "@silue/core";
-import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { openStore } from "./db.ts";
 import { errorText, t } from "./i18n/index.ts";
+import { Icon } from "./icons.tsx";
 import { MessageHtml } from "./MessageHtml.tsx";
 import { htmlMarkdown, textMarkdown } from "./markdown.ts";
-import {
-  deleteProvider,
-  EMPTY_FORM,
-  isProviderReady,
-  loadProviders,
-  type ProviderForm,
-  saveProvider,
-  streamChat,
-} from "./provider.ts";
+import { isProviderReady, loadProviders, type ProviderForm, streamChat } from "./provider.ts";
+import { SettingsSheet, type SettingsTab } from "./SettingsSheet.tsx";
 import "./App.css";
 
 type CharacterItem = { id: string; card: CharacterCardV3 };
@@ -73,29 +64,17 @@ export function App() {
   const [chatId, setChatId] = useState<string>();
   const [view, setView] = useState<View>({ messages: [], siblings: new Map() });
   const [draft, setDraft] = useState("");
-  /** 当前在用的配置（已保存的），生成回复用它 */
+  /** 当前在用的接口配置，生成回复用它 */
   const [provider, setProvider] = useState<ProviderForm>();
-  /** 设置面板里正在编辑的配置，保存前不影响生成 */
-  const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
-  const [profiles, setProfiles] = useState<ProviderProfile[]>([]);
-  const [deletingProvider, setDeletingProvider] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-  /** 已保存的人设；personaForm 是面板里正在改的 */
   const [persona, setPersona] = useState<Persona>({ name: "", description: "" });
-  const [personaForm, setPersonaForm] = useState<Persona>(persona);
-  const [personaOpen, setPersonaOpen] = useState(false);
-  const [personaSaved, setPersonaSaved] = useState(false);
-  const [presets, setPresets] = useState<PresetItem[]>([]);
-  /** 当前选中的预设和它被挪到聊天记录之后的条目名 */
-  const [preset, setPreset] = useState<{ id: string; moved: string[]; sampling: Sampling }>();
-  const [presetOpen, setPresetOpen] = useState(false);
-  const [deletingPreset, setDeletingPreset] = useState(false);
+  /** 设置弹出页开着时是哪一页 */
+  const [settings, setSettings] = useState<SettingsTab>();
   const [streaming, setStreaming] = useState<Streaming>();
   const [editing, setEditing] = useState<{ id: string; text: string }>();
   const [deleting, setDeleting] = useState<string>();
   const abort = useRef<AbortController>(undefined);
   const [now, setNow] = useState(Date.now);
+  const scroller = useRef<HTMLDivElement>(null);
 
   // 还没出字时每秒刷新一次等待秒数：有的中转站要等模型想完才开始返回（实测 15 秒左右）
   const waiting = Boolean(streaming && !streaming.text);
@@ -134,40 +113,14 @@ export function App() {
     setView({ messages, siblings: new Map(messages.map((m) => [m.id, siblingsOf(tree, m)])) });
   }, []);
 
-  const refreshPresets = useCallback(async (s: DocStore) => {
-    const [list, active] = await Promise.all([listPresets(s), activePreset(s)]);
-    setPresets(list);
-    setPreset(
-      active && {
-        id: active.id,
-        moved: movedPresetPrompts(active.preset).map((p) => p.name),
-        sampling: presetSampling(active.preset),
-      },
-    );
-    setDeletingPreset(false);
-  }, []);
-
-  const refreshProviders = useCallback(async (s: DocStore) => {
-    const { profiles, active } = await loadProviders(s);
-    setProfiles(profiles);
-    setProvider(active);
-    setForm(active ?? EMPTY_FORM);
-    setDeletingProvider(false);
-  }, []);
-
   useEffect(() => {
     if (!store) return;
     void refreshCharacters(store);
-    refreshProviders(store).catch((err) => setError(errorText(err)));
-    refreshPresets(store).catch((err) => setError(errorText(err)));
-    loadPersona(store).then(
-      (p) => {
-        setPersona(p);
-        setPersonaForm(p);
-      },
-      (err) => setError(errorText(err)),
-    );
-  }, [store, refreshCharacters, refreshProviders, refreshPresets]);
+    void run(async () => {
+      setProvider((await loadProviders(store)).active);
+      setPersona(await loadPersona(store));
+    });
+  }, [store, refreshCharacters, run]);
   useEffect(() => {
     if (store) void refreshChats(store, characterId);
   }, [store, characterId, refreshChats]);
@@ -175,18 +128,29 @@ export function App() {
     if (store) void refreshView(store, chatId);
   }, [store, chatId, refreshView]);
 
+  // 消息区是 column-reverse，scrollTop 0 就是最底部，内容变高时浏览器自己贴着底部；换聊天时回到底部
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在换聊天时执行
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: 0 });
+  }, [chatId]);
+
   const card = characters.find((c) => c.id === characterId)?.card.data;
   // 正则表跟着卡片变；稳定的引用让 MessageBody 的 memo 生效，打字时不用重新渲染所有消息
   const scripts = useMemo(() => (card ? cardRegexScripts(card) : []), [card]);
+  const closeSettings = useCallback(() => setSettings(undefined), []);
 
-  if (fatal) return <div className="center">{`${t("app.loadFailed")}: ${fatal}`}</div>;
-  if (!store) return <div className="center">{t("app.loading")}</div>;
+  if (fatal) return <div className="splash">{`${t("app.loadFailed")}: ${fatal}`}</div>;
+  if (!store) return <div className="splash">{t("app.loading")}</div>;
+
+  /** {{user}} 用人设的名字；没填时沿用这段聊天里最后一条用户消息的名字（导入的 ST 聊天带名字） */
+  const userNameOf = (path: Message[]) =>
+    persona.name || path.findLast((m) => m.role === "user")?.name || t("chat.you");
 
   /** 生成一条回复，挂在 parentId 下面（发新消息后、重新生成时）。中途停止或出错，已收到的部分照样保存 */
   const generate = async (parentId: string) => {
     if (!chatId || !characterId) return;
     if (!provider || !isProviderReady(provider)) {
-      setSettingsOpen(true);
+      setSettings("model");
       throw new Error(t("settings.missing"));
     }
     const [loaded, character, active] = await Promise.all([
@@ -262,32 +226,6 @@ export function App() {
     });
   };
 
-  const onImportPreset = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    void run(async () => {
-      const id = await importPreset(store, await file.text(), file.name.replace(/\.json$/i, ""));
-      await setActivePreset(store, id);
-      await refreshPresets(store);
-    });
-  };
-
-  const onPickPreset = (id: string) => {
-    void run(async () => {
-      await setActivePreset(store, id);
-      await refreshPresets(store);
-    });
-  };
-
-  const onDeletePreset = (id: string) => {
-    void run(async () => {
-      await removePreset(store, id);
-      await setActivePreset(store, "");
-      await refreshPresets(store);
-    });
-  };
-
   const onNewChat = () => {
     if (!characterId) return;
     void run(async () => {
@@ -300,6 +238,7 @@ export function App() {
   const onSend = () => {
     const content = draft.trim();
     if (!content || !chatId || streaming) return;
+    scroller.current?.scrollTo({ top: 0 });
     void run(async () => {
       const last = view.messages[view.messages.length - 1];
       const sent = await appendMessage(store, chatId, {
@@ -312,6 +251,13 @@ export function App() {
       await refreshView(store, chatId);
       await generate(sent.id);
     });
+  };
+
+  /** Enter 发送，Shift+Enter 换行；输入法还在选字时的 Enter 不算 */
+  const onComposerKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    onSend();
   };
 
   const onRegenerate = (message: Message) => {
@@ -350,478 +296,385 @@ export function App() {
     });
   };
 
-  /** {{user}} 用人设的名字；没填时沿用这段聊天里最后一条用户消息的名字（导入的 ST 聊天带名字） */
-  const userNameOf = (path: Message[]) =>
-    persona.name || path.findLast((m) => m.role === "user")?.name || t("chat.you");
-
-  const onSavePersona = () => {
-    void run(async () => {
-      await savePersona(store, personaForm);
-      const saved = await loadPersona(store);
-      setPersona(saved);
-      setPersonaForm(saved);
-      setPersonaSaved(true);
-    });
-  };
-
-  const onSaveSettings = () => {
-    void run(async () => {
-      await saveProvider(store, form);
-      await refreshProviders(store);
-      setSettingsSaved(true);
-    });
-  };
-
-  /** 下拉框选一套配置就切过去用；选「新建」只清空表单，保存后才生效 */
-  const onPickProvider = (id: string) => {
-    setSettingsSaved(false);
-    if (id === "") return setForm(EMPTY_FORM);
-    void run(async () => {
-      await setActiveProviderProfile(store, id);
-      await refreshProviders(store);
-    });
-  };
-
-  const onDeleteProvider = () => {
-    const id = form.id;
-    if (!id) return;
-    void run(async () => {
-      await deleteProvider(store, id);
-      await refreshProviders(store);
-    });
-  };
-
   // 生成中只显示到要接回复的那条为止：从中间某条重新生成时，后面的旧消息属于另一条分支
   const shown = streaming
     ? view.messages.slice(0, view.messages.findIndex((m) => m.id === streaming.parentId) + 1)
     : view.messages;
-  const effort = reasoningEffort(form.baseUrl, form.thinking ?? "default");
+  const chat = chats.find((c) => c.id === chatId);
+  const chatTitle = (c: Chat) =>
+    c.title ||
+    new Date(c.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
   return (
-    <div className="layout">
-      <aside className="pane">
-        <header>
-          <h2>{t("characters.title")}</h2>
-          <label className="button">
-            {t("characters.import")}
-            <input type="file" accept=".png,.json,.charx" hidden onChange={onImportCard} />
-          </label>
-        </header>
-        {characters.length === 0 && <p className="hint">{t("characters.empty")}</p>}
-        <ul>
-          {characters.map((c) => (
-            <li key={c.id}>
+    <div className={chatId ? "layout chat-open" : "layout"}>
+      <aside className="sidebar">
+        {characterId && card ? (
+          <>
+            <header className="nav-bar">
               <button
                 type="button"
-                className={c.id === characterId ? "item selected" : "item"}
+                className="nav-back"
                 onClick={() => {
-                  setCharacterId(c.id);
+                  setCharacterId(undefined);
                   setChatId(undefined);
                 }}
               >
-                {c.card.data.name}
+                <Icon name="back" />
+                {t("characters.title")}
               </button>
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          className="item settings-toggle"
-          onClick={() => {
-            setSettingsOpen(!settingsOpen);
-            setSettingsSaved(false);
-          }}
-        >
-          {t("settings.title")}
-        </button>
-        {settingsOpen && (
-          <form
-            className="settings"
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSaveSettings();
-            }}
-          >
-            <label>
-              {t("settings.profile")}
-              <select value={form.id ?? ""} onChange={(e) => onPickProvider(e.target.value)}>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name || p.model || p.baseUrl}
-                  </option>
-                ))}
-                <option value="">{t("settings.newProfile")}</option>
-              </select>
-            </label>
-            <label>
-              {t("settings.name")}
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("settings.baseUrl")}
-              <input
-                value={form.baseUrl}
-                placeholder="https://api.example.com"
-                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("settings.model")}
-              <input
-                value={form.model}
-                onChange={(e) => setForm({ ...form, model: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("settings.apiKey")}
-              <input
-                type="password"
-                value={form.apiKey}
-                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("settings.thinking")}
-              <select
-                value={form.thinking ?? "default"}
-                onChange={(e) => setForm({ ...form, thinking: e.target.value as ThinkingLevel })}
-              >
-                {THINKING_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {t(`thinking.${level}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="hint">
-              {effort === undefined
-                ? t("settings.thinkingNone")
-                : t("settings.thinkingActual", { value: effort })}
-            </span>
-            <button type="submit" className="button">
-              {t("settings.save")}
-            </button>
-            {settingsSaved && <span className="hint">{t("settings.saved")}</span>}
-            {form.id &&
-              (deletingProvider ? (
-                <span className="actions">
-                  <button type="button" className="link danger" onClick={onDeleteProvider}>
-                    {t("settings.confirmDeleteProfile")}
-                  </button>
-                  <button type="button" className="link" onClick={() => setDeletingProvider(false)}>
-                    {t("chat.cancel")}
-                  </button>
-                </span>
-              ) : (
+              <div className="nav-actions">
+                <label className="icon-button" title={t("chats.import")}>
+                  <Icon name="import" />
+                  <input type="file" accept=".jsonl" hidden onChange={onImportChat} />
+                </label>
                 <button
                   type="button"
-                  className="link danger"
-                  onClick={() => setDeletingProvider(true)}
+                  className="icon-button"
+                  title={t("chats.new")}
+                  onClick={onNewChat}
                 >
-                  {t("settings.deleteProfile")}
+                  <Icon name="plus" />
                 </button>
-              ))}
-          </form>
-        )}
-        <button
-          type="button"
-          className="item settings-toggle"
-          onClick={() => {
-            setPersonaOpen(!personaOpen);
-            setPersonaSaved(false);
-          }}
-        >
-          {t("persona.title")}
-        </button>
-        {personaOpen && (
-          <form
-            className="settings"
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSavePersona();
-            }}
-          >
-            <label>
-              {t("persona.name")}
-              <input
-                value={personaForm.name}
-                onChange={(e) => setPersonaForm({ ...personaForm, name: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("persona.description")}
-              <textarea
-                rows={6}
-                value={personaForm.description}
-                onChange={(e) => setPersonaForm({ ...personaForm, description: e.target.value })}
-              />
-            </label>
-            <button type="submit" className="button">
-              {t("settings.save")}
-            </button>
-            {personaSaved && <span className="hint">{t("settings.saved")}</span>}
-          </form>
-        )}
-        <button
-          type="button"
-          className="item settings-toggle"
-          onClick={() => setPresetOpen(!presetOpen)}
-        >
-          {t("preset.title")}
-        </button>
-        {presetOpen && (
-          <div className="settings">
-            <label>
-              {t("preset.active")}
-              <select value={preset?.id ?? ""} onChange={(e) => onPickPreset(e.target.value)}>
-                <option value="">{t("preset.none")}</option>
-                {presets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {preset && preset.moved.length > 0 && (
-              <span className="hint">{t("preset.moved", { names: preset.moved.join("、") })}</span>
-            )}
-            {preset && (
-              <span className="hint">
-                {Object.keys(preset.sampling).length > 0
-                  ? t("preset.sampling", {
-                      values: Object.entries(preset.sampling)
-                        .map(([k, v]) => `${k === "maxTokens" ? "max_tokens" : k}: ${v}`)
-                        .join(", "),
-                    })
-                  : t("preset.noSampling")}
-              </span>
-            )}
-            {preset &&
-              (deletingPreset ? (
-                <span className="actions">
+              </div>
+            </header>
+            <div className="sidebar-hero">
+              <Avatar name={card.name} large />
+              <h1>{card.name}</h1>
+            </div>
+            {chats.length === 0 && <p className="sidebar-empty">{t("chats.empty")}</p>}
+            <ul className="list">
+              {chats.map((c) => (
+                <li key={c.id}>
                   <button
                     type="button"
-                    className="link danger"
-                    onClick={() => onDeletePreset(preset.id)}
+                    className={c.id === chatId ? "list-row selected" : "list-row"}
+                    onClick={() => setChatId(c.id)}
                   >
-                    {t("preset.confirmDelete")}
+                    <span className="list-title">{chatTitle(c)}</span>
+                    <Icon name="forward" />
                   </button>
-                  <button type="button" className="link" onClick={() => setDeletingPreset(false)}>
-                    {t("chat.cancel")}
-                  </button>
-                </span>
-              ) : (
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <header className="nav-bar">
+              <span />
+              <div className="nav-actions">
                 <button
                   type="button"
-                  className="link danger"
-                  onClick={() => setDeletingPreset(true)}
+                  className="icon-button"
+                  title={t("settings.title")}
+                  onClick={() => setSettings("model")}
                 >
-                  {t("preset.delete")}
+                  <Icon name="gear" />
                 </button>
+                <label className="icon-button" title={t("characters.import")}>
+                  <Icon name="plus" />
+                  <input type="file" accept=".png,.json,.charx" hidden onChange={onImportCard} />
+                </label>
+              </div>
+            </header>
+            <h1 className="large-title">{t("characters.title")}</h1>
+            {characters.length === 0 && <p className="sidebar-empty">{t("characters.empty")}</p>}
+            <ul className="list">
+              {characters.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className="list-row"
+                    onClick={() => {
+                      setCharacterId(c.id);
+                      setChatId(undefined);
+                    }}
+                  >
+                    <Avatar name={c.card.data.name} />
+                    <span className="list-title">{c.card.data.name}</span>
+                    <Icon name="forward" />
+                  </button>
+                </li>
               ))}
-            <label className="button">
-              {t("preset.import")}
-              <input type="file" accept=".json" hidden onChange={onImportPreset} />
-            </label>
-          </div>
+            </ul>
+          </>
         )}
-      </aside>
-
-      <aside className="pane">
-        <header>
-          <h2>{t("chats.title")}</h2>
-          {characterId && (
-            <div className="actions">
-              <button type="button" className="button" onClick={onNewChat}>
-                {t("chats.new")}
-              </button>
-              <label className="button">
-                {t("chats.import")}
-                <input type="file" accept=".jsonl" hidden onChange={onImportChat} />
-              </label>
-            </div>
-          )}
-        </header>
-        {characterId && chats.length === 0 && <p className="hint">{t("chats.empty")}</p>}
-        <ul>
-          {chats.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                className={c.id === chatId ? "item selected" : "item"}
-                onClick={() => setChatId(c.id)}
-              >
-                {c.title || t("chats.untitled", { date: new Date(c.createdAt).toLocaleString() })}
-              </button>
-            </li>
-          ))}
-        </ul>
       </aside>
 
       <main className="chat">
-        {error && <div className="error">{error}</div>}
-        {!chatId && <p className="hint center">{t("chat.empty")}</p>}
-        <div className="messages">
-          {shown.map((m, i) => {
-            const siblings = view.siblings.get(m.id) ?? [m];
-            const index = siblings.findIndex((s) => s.id === m.id);
-            const usage = m.usage as Usage | undefined;
-            return (
-              <article key={m.id} className={`message ${m.role}`}>
-                <div className="meta">
-                  <span className="name">{m.name}</span>
-                  {siblings.length > 1 && (
-                    <span className="switcher">
-                      <button
-                        type="button"
-                        aria-label={t("chat.previous")}
-                        disabled={index === 0}
-                        onClick={() => onSwitch(m, -1)}
-                      >
-                        ‹
-                      </button>
-                      {t("chat.branch", { index: index + 1, total: siblings.length })}
-                      <button
-                        type="button"
-                        aria-label={t("chat.next")}
-                        disabled={index === siblings.length - 1}
-                        onClick={() => onSwitch(m, 1)}
-                      >
-                        ›
-                      </button>
-                    </span>
-                  )}
-                  {!streaming && editing?.id !== m.id && (
-                    <span className="actions-inline">
-                      {m.role === "assistant" && m.parentId !== null && (
-                        <button type="button" className="link" onClick={() => onRegenerate(m)}>
-                          {t("chat.regenerate")}
+        {chatId && chat && card ? (
+          <>
+            <header className="nav-bar chat-bar">
+              <button
+                type="button"
+                className="nav-back narrow-only"
+                onClick={() => setChatId(undefined)}
+              >
+                <Icon name="back" />
+                {t("chats.title")}
+              </button>
+              <div className="chat-title">
+                <strong>{card.name}</strong>
+                <span>{chatTitle(chat)}</span>
+              </div>
+              <span className="narrow-only nav-spacer" />
+            </header>
+            {error && <ErrorBanner text={error} onClose={() => setError(undefined)} />}
+            <div className="messages" ref={scroller}>
+              <div className="column">
+                {shown.map((m, i) => {
+                  const siblings = view.siblings.get(m.id) ?? [m];
+                  const index = siblings.findIndex((s) => s.id === m.id);
+                  const usage = m.usage as Usage | undefined;
+                  const isLast = i === shown.length - 1;
+                  const actions =
+                    !streaming &&
+                    editing?.id !== m.id &&
+                    (deleting === m.id ? (
+                      <span className="message-actions visible">
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => setDeleting(undefined)}
+                        >
+                          {t("chat.cancel")}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        className="link"
-                        onClick={() => setEditing({ id: m.id, text: m.content })}
-                      >
-                        {t("chat.edit")}
-                      </button>
-                      {deleting === m.id ? (
-                        <>
-                          <button type="button" className="link danger" onClick={() => onDelete(m)}>
-                            {t("chat.confirmDelete")}
-                          </button>
+                        <button
+                          type="button"
+                          className="text-button danger"
+                          onClick={() => onDelete(m)}
+                        >
+                          {t("chat.confirmDelete")}
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="message-actions">
+                        {m.role === "assistant" && m.parentId !== null && (
                           <button
                             type="button"
-                            className="link"
-                            onClick={() => setDeleting(undefined)}
+                            className="icon-button small"
+                            title={t("chat.regenerate")}
+                            onClick={() => onRegenerate(m)}
                           >
-                            {t("chat.cancel")}
+                            <Icon name="regenerate" />
                           </button>
-                        </>
-                      ) : (
-                        <button type="button" className="link" onClick={() => setDeleting(m.id)}>
-                          {t("chat.delete")}
+                        )}
+                        <button
+                          type="button"
+                          className="icon-button small"
+                          title={t("chat.edit")}
+                          onClick={() => setEditing({ id: m.id, text: m.content })}
+                        >
+                          <Icon name="edit" />
                         </button>
+                        <button
+                          type="button"
+                          className="icon-button small"
+                          title={t("chat.delete")}
+                          onClick={() => setDeleting(m.id)}
+                        >
+                          <Icon name="trash" />
+                        </button>
+                      </span>
+                    ));
+                  return (
+                    <article key={m.id} className={`message ${m.role}${isLast ? " last" : ""}`}>
+                      <header className="message-meta">
+                        <span className="name">{m.name}</span>
+                        {siblings.length > 1 && (
+                          <span className="switcher">
+                            <button
+                              type="button"
+                              aria-label={t("chat.previous")}
+                              disabled={index === 0 || Boolean(streaming)}
+                              onClick={() => onSwitch(m, -1)}
+                            >
+                              <Icon name="back" />
+                            </button>
+                            {t("chat.branch", { index: index + 1, total: siblings.length })}
+                            <button
+                              type="button"
+                              aria-label={t("chat.next")}
+                              disabled={index === siblings.length - 1 || Boolean(streaming)}
+                              onClick={() => onSwitch(m, 1)}
+                            >
+                              <Icon name="forward" />
+                            </button>
+                          </span>
+                        )}
+                        {!isLast && actions}
+                      </header>
+                      {typeof m.reasoning === "string" && m.reasoning && (
+                        <details className="reasoning">
+                          <summary>{t("chat.reasoning")}</summary>
+                          <div className="reasoning-text">{m.reasoning}</div>
+                        </details>
                       )}
-                    </span>
-                  )}
-                </div>
-                {typeof m.reasoning === "string" && m.reasoning && (
-                  <details className="reasoning">
-                    <summary>{t("chat.reasoning")}</summary>
-                    <div className="content">{m.reasoning}</div>
-                  </details>
+                      {editing?.id === m.id ? (
+                        <form
+                          className="editor"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            onSaveEdit();
+                          }}
+                        >
+                          <textarea
+                            value={editing.text}
+                            onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
+                          />
+                          <div className="editor-actions">
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() => setEditing(undefined)}
+                            >
+                              {t("chat.cancel")}
+                            </button>
+                            <button type="submit" className="pill-button">
+                              {t("chat.save")}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <MessageBody
+                          message={m}
+                          depth={shown.length - 1 - i}
+                          scripts={scripts}
+                          charName={card.name}
+                          userName={userNameOf(shown)}
+                        />
+                      )}
+                      {(usage || (isLast && actions)) && (
+                        <footer className="message-foot">
+                          {usage && (
+                            <span className="usage">
+                              {t("chat.usage", {
+                                input: usage.input,
+                                cached: usage.cachedInput ?? t("chat.cacheUnknown"),
+                                output: usage.output,
+                              })}
+                              {usage.reasoning != null &&
+                                t("chat.usageReasoning", { reasoning: usage.reasoning })}
+                            </span>
+                          )}
+                          {isLast && actions}
+                        </footer>
+                      )}
+                    </article>
+                  );
+                })}
+                {streaming && (
+                  <article className="message assistant">
+                    <header className="message-meta">
+                      <span className="name">{card.name}</span>
+                      <span className="status">
+                        {streaming.text
+                          ? t("chat.generating")
+                          : t(streaming.reasoning ? "chat.thinking" : "chat.waiting", {
+                              seconds: Math.max(0, Math.round((now - streaming.startedAt) / 1000)),
+                            })}
+                      </span>
+                    </header>
+                    {streaming.reasoning && (
+                      <details className="reasoning">
+                        <summary>{t("chat.reasoning")}</summary>
+                        <div className="reasoning-text">{streaming.reasoning}</div>
+                      </details>
+                    )}
+                    <div className="streaming-text">{streaming.text}</div>
+                  </article>
                 )}
-                {editing?.id === m.id ? (
-                  <form
-                    className="editor"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      onSaveEdit();
-                    }}
-                  >
-                    <textarea
-                      value={editing.text}
-                      onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
-                    />
-                    <div className="actions">
-                      <button type="submit" className="button">
-                        {t("chat.save")}
-                      </button>
-                      <button type="button" className="link" onClick={() => setEditing(undefined)}>
-                        {t("chat.cancel")}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <MessageBody
-                    message={m}
-                    depth={shown.length - 1 - i}
-                    scripts={scripts}
-                    charName={card?.name ?? m.name}
-                    userName={userNameOf(shown)}
-                  />
-                )}
-                {usage && (
-                  <div className="usage">
-                    {t("chat.usage", {
-                      input: usage.input,
-                      cached: usage.cachedInput ?? t("chat.cacheUnknown"),
-                      output: usage.output,
-                    })}
-                    {usage.reasoning != null &&
-                      t("chat.usageReasoning", { reasoning: usage.reasoning })}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-          {streaming && (
-            <article className="message assistant">
-              <div className="meta">
-                <span className="name">
-                  {streaming.text
-                    ? t("chat.generating")
-                    : t(streaming.reasoning ? "chat.thinking" : "chat.waiting", {
-                        seconds: Math.max(0, Math.round((now - streaming.startedAt) / 1000)),
-                      })}
-                </span>
-                <button type="button" className="link" onClick={() => abort.current?.abort()}>
-                  {t("chat.stop")}
-                </button>
               </div>
-              {streaming.reasoning && (
-                <details className="reasoning">
-                  <summary>{t("chat.reasoning")}</summary>
-                  <div className="content">{streaming.reasoning}</div>
-                </details>
-              )}
-              <div className="content">{streaming.text}</div>
-            </article>
-          )}
-        </div>
-        {chatId && (
-          <form
-            className="composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSend();
-            }}
-          >
-            <textarea
-              value={draft}
-              placeholder={t("chat.placeholder")}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button type="submit" className="button" disabled={Boolean(streaming)}>
-              {t("chat.send")}
-            </button>
-          </form>
+            </div>
+            <form
+              className="composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSend();
+              }}
+            >
+              <div className="composer-box">
+                <textarea
+                  rows={1}
+                  value={draft}
+                  placeholder={t("chat.placeholder")}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    // 跟着内容长高，最多 8 行左右
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                  }}
+                  onKeyDown={onComposerKey}
+                />
+                {streaming ? (
+                  <button
+                    type="button"
+                    className="send-button stop"
+                    aria-label={t("chat.stop")}
+                    onClick={() => abort.current?.abort()}
+                  >
+                    <Icon name="stop" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="send-button"
+                    aria-label={t("chat.send")}
+                    disabled={!draft.trim()}
+                  >
+                    <Icon name="send" />
+                  </button>
+                )}
+              </div>
+            </form>
+          </>
+        ) : (
+          <>
+            {error && <ErrorBanner text={error} onClose={() => setError(undefined)} />}
+            <div className="chat-empty">{t(characterId ? "chat.empty" : "chat.pickCharacter")}</div>
+          </>
         )}
       </main>
+
+      {settings && (
+        <SettingsSheet
+          store={store}
+          tab={settings}
+          onTab={setSettings}
+          onClose={closeSettings}
+          run={run}
+          onProviderChange={setProvider}
+          onPersonaChange={setPersona}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 没有头像图片时用名字的第一个字，颜色按名字固定 */
+function Avatar({ name, large = false }: { name: string; large?: boolean }) {
+  const hue = [...name].reduce((h, ch) => (h * 31 + (ch.codePointAt(0) ?? 0)) % 360, 0);
+  return (
+    <span
+      className={large ? "avatar large" : "avatar"}
+      style={{ background: `hsl(${hue} 45% 55%)` }}
+    >
+      {[...name.trim()][0] ?? "?"}
+    </span>
+  );
+}
+
+function ErrorBanner({ text, onClose }: { text: string; onClose: () => void }) {
+  return (
+    <div className="error-banner" role="alert">
+      <span>{text}</span>
+      <button
+        type="button"
+        className="icon-button small"
+        aria-label={t("chat.dismiss")}
+        onClick={onClose}
+      >
+        <Icon name="close" />
+      </button>
     </div>
   );
 }
@@ -849,7 +702,7 @@ const MessageBody = memo(function MessageBody(props: {
   if (regexed !== m.content) return <MessageHtml html={htmlMarkdown.render(text)} />;
   return (
     <div
-      className="content markdown"
+      className="markdown"
       // biome-ignore lint/security/noDangerouslySetInnerHtml: textMarkdown 关了 HTML，原文里的标签会被转义
       dangerouslySetInnerHTML={{ __html: textMarkdown.render(text) }}
     />
