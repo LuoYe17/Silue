@@ -1,6 +1,7 @@
 // OpenAI 兼容的 /chat/completions 接口：拼请求、解析流式返回。不发网络请求，发请求由各端自己做
 // （App 用 Tauri 的 HTTP 插件，测试直接喂字符串）。请求内容由 openai.test.ts 的标准答案锁死。
 import { z } from "zod";
+import { reasoningEffort, type ThinkingLevel } from "./thinking.ts";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -12,6 +13,8 @@ export interface ProviderConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** 思考深度，没有时按 default（不发参数） */
+  thinking?: ThinkingLevel;
 }
 
 export interface HttpRequest {
@@ -74,6 +77,8 @@ export function openAiChatRequest(config: ProviderConfig, messages: ChatMessage[
       messages,
       stream: true,
       stream_options: { include_usage: true },
+      // 放在最后：不改前面字段的顺序，default 时请求体和以前逐字相同
+      reasoning_effort: reasoningEffort(config.baseUrl, config.thinking ?? "default"),
     }),
   };
 }

@@ -9,6 +9,8 @@ import {
   providerHttpError,
   SseDecoder,
   type StreamEvent,
+  THINKING_LEVELS,
+  type ThinkingLevel,
 } from "@silue/core";
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
@@ -17,18 +19,26 @@ const SETTINGS = "settings";
 const PROVIDER = "provider";
 const API_KEY_SECRET = "provider.apiKey";
 
-type ProviderSettings = { baseUrl: string; model: string };
+type ProviderSettings = { baseUrl: string; model: string; thinking: ThinkingLevel };
 
 export async function loadProvider(store: DocStore): Promise<ProviderConfig> {
   const doc = await store.get<ProviderSettings>(SETTINGS, PROVIDER);
   const apiKey = await invoke<string | null>("secret_get", { name: API_KEY_SECRET });
-  return { baseUrl: doc?.data.baseUrl ?? "", model: doc?.data.model ?? "", apiKey: apiKey ?? "" };
+  // 设置会同步，别的设备（或更新的版本）写来的档位不认识时按 default 处理
+  const thinking = THINKING_LEVELS.find((level) => level === doc?.data.thinking) ?? "default";
+  return {
+    baseUrl: doc?.data.baseUrl ?? "",
+    model: doc?.data.model ?? "",
+    apiKey: apiKey ?? "",
+    thinking,
+  };
 }
 
 export async function saveProvider(store: DocStore, config: ProviderConfig): Promise<void> {
   await store.put<ProviderSettings>(SETTINGS, PROVIDER, {
     baseUrl: config.baseUrl.trim(),
     model: config.model.trim(),
+    thinking: config.thinking ?? "default",
   });
   await invoke("secret_set", { name: API_KEY_SECRET, value: config.apiKey.trim() });
 }

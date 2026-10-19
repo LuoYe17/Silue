@@ -17,8 +17,11 @@ import {
   loadChat,
   type Message,
   type ProviderConfig,
+  reasoningEffort,
   selectBranch,
   siblingsOf,
+  THINKING_LEVELS,
+  type ThinkingLevel,
   activePath as toActivePath,
   type Usage,
 } from "@silue/core";
@@ -32,7 +35,7 @@ type CharacterItem = { id: string; card: CharacterCardV3 };
 type View = { messages: Message[]; siblings: Map<string, Message[]> };
 type Streaming = { parentId: string; text: string; reasoning: string; startedAt: number };
 
-const EMPTY_PROVIDER: ProviderConfig = { baseUrl: "", model: "", apiKey: "" };
+const EMPTY_PROVIDER: ProviderConfig = { baseUrl: "", model: "", apiKey: "", thinking: "default" };
 
 export function App() {
   const [store, setStore] = useState<DocStore>();
@@ -229,6 +232,7 @@ export function App() {
   };
 
   const lastId = view.messages[view.messages.length - 1]?.id;
+  const effort = reasoningEffort(provider.baseUrl, provider.thinking ?? "default");
 
   return (
     <div className="layout">
@@ -298,6 +302,26 @@ export function App() {
                 onChange={(e) => setProvider({ ...provider, apiKey: e.target.value })}
               />
             </label>
+            <label>
+              {t("settings.thinking")}
+              <select
+                value={provider.thinking ?? "default"}
+                onChange={(e) =>
+                  setProvider({ ...provider, thinking: e.target.value as ThinkingLevel })
+                }
+              >
+                {THINKING_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {t(`thinking.${level}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="hint">
+              {effort === undefined
+                ? t("settings.thinkingNone")
+                : t("settings.thinkingActual", { value: effort })}
+            </span>
             <button type="submit" className="button">
               {t("settings.save")}
             </button>
@@ -393,6 +417,8 @@ export function App() {
                       cached: usage.cachedInput ?? t("chat.cacheUnknown"),
                       output: usage.output,
                     })}
+                    {usage.reasoning != null &&
+                      t("chat.usageReasoning", { reasoning: usage.reasoning })}
                   </div>
                 )}
               </article>

@@ -87,4 +87,5 @@ Status: implemented
   - 用户名暂时取这段聊天里最后一条用户消息的名字，没有就用「你」。
   - 不发 `max_tokens`，回复长度由模型默认值决定。
   - 用这个中转站时，发出后要等十几秒才出字（真 App 里万象卡那次超过 30 秒，提示词有 5158 个 token）。原因在中转站（见上面的计时表）。App 这边是边收边显示的：`tauri-plugin-http` 2.8.3 的 Rust 端每收到一块网络数据（`res.chunk()`）就交给前端一次。界面在还没出字时显示「等待模型回复… N 秒」，让人知道没有卡住。
-- 还没做：思考深度档位（[思考深度](../../proposed/feature/2026-10-19-thinking-depth-levels.md)）、Claude / Gemini / OpenAI / DeepSeek 原生接口、预设和世界书、花费显示、模型列表下拉。
+- 思考深度档位已经做了，见 [思考深度档位](2026-10-19-thinking-levels.md)。
+- 还没做：Claude / Gemini / OpenAI / DeepSeek 原生接口、预设和世界书、花费显示、模型列表下拉。

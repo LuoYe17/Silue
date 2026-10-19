@@ -253,3 +253,12 @@ ul {
 .reasoning summary {
   cursor: pointer;
 }
+
+.settings select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
