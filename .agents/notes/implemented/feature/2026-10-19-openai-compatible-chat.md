@@ -20,6 +20,15 @@ Status: implemented
   | Anthropic 格式，`thinking: {type: "disabled"}` | 13.8s | 15.9s | 948 |
 
   中转站等模型想完才返回响应头，思考过程不传回来，两种格式里控制思考的参数都不起作用。正文本身是分块流式发的，约 2～3 秒发完。
+- 同一个中转站换一个密钥能用 `deepseek-v4.1-flash` 和 `deepseek-v4-pro`（不是 DeepSeek 官方接口，官方接口说这个密钥无效）。同样的请求，OpenAI 格式：
+
+  | 模型 | 开始传思考 | 第一个正文字 | 发完 | 输入 token |
+  |---|---|---|---|---|
+  | deepseek-v4.1-flash | 2.1s | 2.3s | 4.5s | 69 |
+  | deepseek-v4-pro | 3.3s | 4.2s | 15.1s | 525 |
+
+  思考过程在 `delta.reasoning_content` 里边想边传。同一句话 Gemini 计的输入是 18 个 token，DeepSeek 两个模型多出来的部分不是这边发的，应该是中转站在前面加了内容。
+- 在真 App 里用 `deepseek-v4.1-flash` 接着万象那段聊天发「1 开始」：发出去的提示词约 7800 字，中转站计的输入只有 744 个 token；流式返回的用量里没有缓存命中数。同样内容改成非流式请求，用量是 `prompt_tokens: 744`、`prompt_tokens_details.cached_tokens: 512`。也就是说，这个中转站只在非流式返回里带缓存命中数；744 这个数怎么算出来的，从这边查不出来。
 
 这些是中转站自己的行为，不能当成 Gemini 官方接口的行为。
 
@@ -35,7 +44,7 @@ Status: implemented
 - `packages/core/src/llm/openai.ts`：
   - `openAiChatRequest(config, messages)` 返回 `{ url, headers, body }`。请求体固定是 `model`、`messages`、`stream: true`、`stream_options: { include_usage: true }`，不发 `max_tokens`、温度、思考参数。
   - `chatCompletionsUrl(baseUrl)`：只填了域名时补 `/v1`；带了路径就照用（比如 Gemini 官方兼容地址 `.../v1beta/openai`）；已经以 `/chat/completions` 结尾的不再加。
-  - `SseDecoder` 把一块块收到的文本切成 SSE 事件，兼容 CRLF 和任意切分；`parseOpenAiEvent` 把一个事件变成 `text`、`reasoning`、`usage`、`finish`。思考内容认 `reasoning_content`（DeepSeek）和 `reasoning`（OpenRouter 等）两种字段；用量里的 `prompt_tokens_details.cached_tokens` 和 `completion_tokens_details.reasoning_tokens` 有就带上，没有就不带（界面显示「未知」）。
+  - `SseDecoder` 把一块块收到的文本切成 SSE 事件，兼容 CRLF 和任意切分；`parseOpenAiEvent` 把一个事件变成 `text`、`reasoning`、`usage`、`finish`。思考内容认 `reasoning_content`（DeepSeek）和 `reasoning`（OpenRouter 等）两种字段；用量里的 `prompt_tokens_details.cached_tokens`（没有时取 DeepSeek 官方的 `prompt_cache_hit_tokens`，见 https://api-docs.deepseek.com/guides/kv_cache ）和 `completion_tokens_details.reasoning_tokens` 有就带上，没有就不带（界面显示「未知」）。
   - 出错抛 `ProviderError`，`code` 是 `http`（状态码不是 2xx，`detail` 取 `error.message`，取不到用原文前 500 字）、`api`（流里夹着错误对象）、`bad_response`（不是 JSON 或结构不对）。界面按 `code` 翻译。
 - `packages/core/src/prompt/chat-prompt.ts` 的 `buildChatPrompt`：
   - 顺序：系统提示 → 角色描述 → 性格 → 场景 → 示例对话（合成一条 system 消息）→ 当前这条线的聊天记录 → `post_history_instructions`（放在最后）。不变的在前、每轮变的在后，按 [缓存排布](../../proposed/feature/2026-10-19-prompt-cache-layout.md) 的思路。
@@ -57,6 +66,7 @@ Status: implemented
 - 接口地址和模型名存在数据库的 `settings` 集合（id `provider`），以后跟着同步；API Key 不同步。
 - `packages/app/src/provider.ts` 的 `streamChat` 发请求、边收边解析、逐个回调事件。`App.tsx` 里发消息后自动生成回复，回复挂在用户消息下面；「重新生成」在同一个父消息下再生成一条，成为兄弟（左右切换）。生成中可以停止。停止或出错时，已经收到的文字照样存成一条消息，不丢。
 - 生成的消息额外存 `model`、`usage`（有就存）、`reasoning`（有就存），界面在回复下面显示输入、缓存命中、输出的 token 数。
+- 思考过程用 `<details>` 显示在正文上面，默认折叠（[思考深度](../../proposed/feature/2026-10-19-thinking-depth-levels.md) 的要求）。生成中还没出正文时，标题显示「等待模型回复… N 秒」；已经收到思考内容时显示「思考中… N 秒」。拼提示词时只用 `content`，不把上一轮的思考内容发回给模型。
 
 ## Alternatives considered
 
@@ -70,7 +80,7 @@ Status: implemented
 - 收益：
   - 开发者能在 Silue 里用自己的中转站聊天，请求内容有标准答案测试兜底。
   - 2026-10-19 在真 App 里用开发者的中转站和 `gemini-3.8-flash` 试过：设置里填接口地址、模型、API Key 后保存，Key 出现在 Windows 凭据管理器（`provider.apiKey.io.github.luoye17.silue`），刷新页面后能读回来；万象卡新建聊天发「随机来两个」，回复按开场白的要求给出两个方案，用量显示「输入 5158（缓存命中 未知）· 输出 1571」。
-  - core 新增 18 个测试：URL 拼接 5 个、请求标准答案 1 个、流式解析 6 个（用中转站的真实返回，切成 7 字一块、CRLF、末尾无空行、思考和缓存用量、注释行、错误）、HTTP 错误 1 个、提示词 5 个（标准答案、缓存前缀、`{{original}}`、`post_history_instructions`、宏）。
+  - core 新增 19 个测试：URL 拼接 5 个、请求标准答案 1 个、流式解析 7 个（用中转站的真实返回，切成 7 字一块、CRLF、末尾无空行、思考和缓存用量、DeepSeek 的缓存字段、注释行、错误）、HTTP 错误 1 个、提示词 5 个（标准答案、缓存前缀、`{{original}}`、`post_history_instructions`、宏）。
 - 代价和限制：
   - `keyring` 的经典接口不支持 iOS，做 iOS 时要换成 `keyring-core` 加 `apple-native-keyring-store`（`lib.rs` 里有 `shortcut:` 注释）。
   - `http:default` 允许前端请求任意地址。以后做卡片 HTML 沙盒时，沙盒里的内容不能拿到 Tauri 的 IPC（见 [消息里的 HTML](../../proposed/feature/2026-10-19-card-html-sandbox.md)）。

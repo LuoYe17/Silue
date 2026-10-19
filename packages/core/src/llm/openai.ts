@@ -133,6 +133,8 @@ const chunkSchema = z.looseObject({
       prompt_tokens: z.number(),
       completion_tokens: z.number(),
       prompt_tokens_details: z.looseObject({ cached_tokens: count }).nullish(),
+      // DeepSeek 官方接口把缓存命中数放在这里（https://api-docs.deepseek.com/guides/kv_cache）
+      prompt_cache_hit_tokens: count,
       completion_tokens_details: z.looseObject({ reasoning_tokens: count }).nullish(),
     })
     .nullish(),
@@ -161,14 +163,13 @@ export function parseOpenAiEvent(data: string): StreamEvent[] {
   if (choice?.delta?.content) events.push({ type: "text", text: choice.delta.content });
   if (choice?.finish_reason) events.push({ type: "finish", reason: choice.finish_reason });
   if (usage) {
+    const cachedInput = usage.prompt_tokens_details?.cached_tokens ?? usage.prompt_cache_hit_tokens;
     events.push({
       type: "usage",
       usage: {
         input: usage.prompt_tokens,
         output: usage.completion_tokens,
-        ...(usage.prompt_tokens_details?.cached_tokens != null && {
-          cachedInput: usage.prompt_tokens_details.cached_tokens,
-        }),
+        ...(cachedInput != null && { cachedInput }),
         ...(usage.completion_tokens_details?.reasoning_tokens != null && {
           reasoning: usage.completion_tokens_details.reasoning_tokens,
         }),

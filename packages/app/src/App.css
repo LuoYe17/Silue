@@ -243,3 +243,13 @@ ul {
   font-size: 12px;
   color: var(--muted);
 }
+
+.reasoning {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.reasoning summary {
+  cursor: pointer;
+}

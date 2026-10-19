@@ -96,6 +96,14 @@ describe("流式解析", () => {
     ]);
   });
 
+  test("DeepSeek 官方的缓存命中字段 prompt_cache_hit_tokens", () => {
+    expect(
+      decodeAll([
+        'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"prompt_cache_hit_tokens":64,"prompt_cache_miss_tokens":36}}\n\n',
+      ]),
+    ).toEqual([{ type: "usage", usage: { input: 100, output: 5, cachedInput: 64 } }]);
+  });
+
   test("注释行和其他字段忽略", () => {
     expect(
       decodeAll([': ping\nevent: x\nid: 1\ndata: {"choices":[{"delta":{"content":"a"}}]}\n\n']),

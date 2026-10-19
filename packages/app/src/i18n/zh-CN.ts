@@ -21,6 +21,8 @@ export const zhCN = {
   "chat.stop": "停止",
   "chat.generating": "正在生成…",
   "chat.waiting": "等待模型回复… {seconds} 秒",
+  "chat.thinking": "思考中… {seconds} 秒",
+  "chat.reasoning": "思考过程",
   "chat.usage": "输入 {input}（缓存命中 {cached}）· 输出 {output}",
   "chat.cacheUnknown": "未知",
   "settings.title": "模型设置",

@@ -379,6 +379,12 @@ export function App() {
                       </button>
                     )}
                 </div>
+                {typeof m.reasoning === "string" && m.reasoning && (
+                  <details className="reasoning">
+                    <summary>{t("chat.reasoning")}</summary>
+                    <div className="content">{m.reasoning}</div>
+                  </details>
+                )}
                 <div className="content">{m.content}</div>
                 {usage && (
                   <div className="usage">
@@ -398,7 +404,7 @@ export function App() {
                 <span className="name">
                   {streaming.text
                     ? t("chat.generating")
-                    : t("chat.waiting", {
+                    : t(streaming.reasoning ? "chat.thinking" : "chat.waiting", {
                         seconds: Math.max(0, Math.round((now - streaming.startedAt) / 1000)),
                       })}
                 </span>
@@ -406,6 +412,12 @@ export function App() {
                   {t("chat.stop")}
                 </button>
               </div>
+              {streaming.reasoning && (
+                <details className="reasoning">
+                  <summary>{t("chat.reasoning")}</summary>
+                  <div className="content">{streaming.reasoning}</div>
+                </details>
+              )}
               <div className="content">{streaming.text}</div>
             </article>
           )}
