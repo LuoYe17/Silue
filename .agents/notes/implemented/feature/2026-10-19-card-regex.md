@@ -41,6 +41,8 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
 
 ## Consequences
 
+- 2026-10-20 改成只给滚动容器上下 1500px 以内的消息建 iframe（`IntersectionObserver` 的 root 设成 `.messages`；用默认的视口作 root 时 rootMargin 不放大滚动容器的裁剪范围，实测只建了 1、2 个），滚远了销毁、留同高的空白占位。203 条的聊天里同时存在的 iframe 从 101 个降到 2 到 4 个；用脚本每 16 毫秒往下滚 400px 一路滚到底，帧间隔中位数 7 毫秒、95 分位 14 毫秒、最长 42 毫秒（Windows 开发模式，改之前没有测）。
+
 - 2026-10-20 加上 Markdown 后，在真 App 里看：`# 第1章` 显示成标题，`---` 显示成分隔线，万象的状态栏、展开后的人物块和进度条样子不变。203 条的聊天里 101 条 AI 消息进 iframe，102 条用户消息直接渲染。
 
 - 2026-10-19 在真 App 里用开发者的万象卡和从 Tavo 导入的聊天验证（只在本地跑，卡片和聊天含成人内容，不进仓库）：
@@ -54,5 +56,6 @@ SillyTavern 把角色卡的正则存在 `extensions.regex_scripts` 里，导入�
 - 还没做（代码里有 `shortcut:` 注释）：
   - 中文紧贴标点的粗体（如 `文字**【x】**文字`）按 CommonMark 规则不生效；有需要再加 markdown-it-cjk-friendly。
   - 全局正则、导入 Tavo 导出的正则文件、正则管理界面。
-  - 每条消息一个 iframe：203 条的聊天里同时有 101 个，没有测滚动是否卡顿，也没在 iPhone 上试。
+  - 没在 iPhone 上试滚动。
+  - iframe 滚远后销毁，再滚回来时展开过的 `<details>` 会收起。
   - 卡片里的图片、字体只能从本地加载（CSP 的 `img-src` 没放开网络地址），引用网络图片的卡显示不出图。

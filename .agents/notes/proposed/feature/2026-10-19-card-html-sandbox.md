@@ -21,7 +21,7 @@ Status: proposed
 
 ### 已经落地的部分
 
-不带 JS 的那一半先做了，见 [角色卡正则](../../implemented/feature/2026-10-19-card-regex.md)：正则改出来的 HTML 放进 `<iframe sandbox="allow-same-origin" srcdoc=…>`，不给 `allow-scripts`；外层用 ResizeObserver 量高度；`style-src` 关掉 Tauri 的哈希注入，让卡片的内联样式生效。万象卡的状态栏在开发模式的真 App 里显示正常。自定义协议、卡片 JS、只渲染屏幕上的消息都还没做。
+不带 JS 的那一半先做了，见 [角色卡正则](../../implemented/feature/2026-10-19-card-regex.md)：正则改出来的 HTML 放进 `<iframe sandbox="allow-same-origin" srcdoc=…>`，不给 `allow-scripts`；外层用 ResizeObserver 量高度；`style-src` 关掉 Tauri 的哈希注入，让卡片的内联样式生效。万象卡的状态栏在开发模式的真 App 里显示正常。只渲染屏幕附近的消息也做了（Windows 上测过，iPhone 没测）。自定义协议、卡片 JS 还没做。
 
 ## Alternatives considered
 
