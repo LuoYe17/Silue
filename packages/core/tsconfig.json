@@ -3,5 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2024"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // 测试文件用 Node 的 API（比如 node:sqlite），由 tsconfig.test.json 单独检查；这里只检查发出去的代码
+  "exclude": ["src/**/*.test.ts", "src/testing"]
 }

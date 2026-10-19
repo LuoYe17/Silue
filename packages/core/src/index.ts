@@ -6,3 +6,8 @@ export const APP_NAME = "Silue";
 export * from "./card/import.ts";
 export * from "./card/schema.ts";
 export * from "./chat/import-st.ts";
+export * from "./chat/repo.ts";
+export * from "./chat/tree.ts";
+export * from "./store/doc-store.ts";
+export type { SqlDriver, SqlValue } from "./store/driver.ts";
+export * from "./store/merge.ts";

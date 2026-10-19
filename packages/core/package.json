@@ -7,10 +7,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "fflate": "0.8.3",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
   }
 }

@@ -12,7 +12,7 @@ Status: implemented
 
 ST 自己导出的消息还可能带 `swipes` 和 `swipe_id`。
 
-Silue 的聊天存成一棵消息树（[同步](../../proposed/architecture/2026-10-19-sync-e2e-cloudflare.md)），但存储层还没写。
+Silue 的聊天存成一棵消息树（[同步](../../proposed/architecture/2026-10-19-sync-e2e-cloudflare.md)），写这个导入时存储层还没写。
 
 ## Decision
 
@@ -50,7 +50,7 @@ Silue 的聊天存成一棵消息树（[同步](../../proposed/architecture/2026
   这个文件含成人内容，没有放进仓库。
 - 代价：
   - 文件要整个读进内存再按行拆分。几百条消息、几 MB 的文件没有问题，几百 MB 的大文件会占很多内存。
-  - 存储层定下来以后，还要另外写「线性列表 → 消息树」的转换。
+  - 「线性列表 → 消息树」的转换另外写在存储层的 `importStChatToStore` 里，见 [本地存储](../architecture/2026-10-19-doc-store.md)。
 - 测试：`packages/core/src/chat/import-st.test.ts`，共 8 个，覆盖：
   - Tavo 的导出格式
   - ST 的多条备选回复，`swipe_id` 越界

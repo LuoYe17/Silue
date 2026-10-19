@@ -20,7 +20,7 @@ Status: implemented
   - 必填的文本缺了或是 `null`，补 `""`；必填的数组补 `[]`；`extensions` 补 `{}`。
   - 世界书条目的 `enabled` 默认 `true`，`insertion_order` 默认 `0`。
   - 可选字段是 `null` 时，当作没有这个字段。
-- **只有一个硬要求**：`name` 必须是字符串，否则拒绝导入。
+- **硬要求**：`name` 必须是字符串，否则拒绝导入。没有 `spec` 的 JSON 按 V1 处理时，还必须有 `first_mes` 字段（V1 规格里必填）：2026-10-19 在真 App 里试导入 ST 预设文件 `万象_预设.json`，它只有 `name` 没有角色字段，原来被当成 V1 卡导入了。
 - **不认识的字段全部保留**：用 zod 的 `looseObject`。规格允许这样做，导出时可以原样带上；Tavo、ST 的私有字段也不会丢。
 - 世界书条目的 `position`：规格写的是字符串，但兼容数字，因为 SillyTavern 导出的卡里见过数字。
 
@@ -72,8 +72,9 @@ core 的 tsconfig 不带 DOM 类型，用到的 `atob` / `btoa` 在 `src/web-glo
   - PNG 的 `chara-ext-asset_:` 资源块（规格建议新应用不要实现）。
   - 导出成 PNG 或 CHARX。
   - ST 单独导出的世界书文件（格式和卡片里的 `character_book` 不同）。
-- 测试：`packages/core/src/card/import.test.ts`，共 13 个，覆盖：
+- 测试：`packages/core/src/card/import.test.ts`，共 14 个，覆盖：
   - V1、V2 升级
+  - 没有 `spec` 也没有 `first_mes` 的 JSON（ST 预设）
   - `null` 字段
   - 缺名字
   - BOM

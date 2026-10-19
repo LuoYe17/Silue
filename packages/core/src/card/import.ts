@@ -94,6 +94,10 @@ export function parseCardJson(json: unknown): Pick<ImportedCard, "card" | "sourc
   const versioned = versionedSchema.safeParse(json);
   const sourceVersion = versioned.success ? (versioned.data.spec === "chara_card_v3" ? 3 : 2) : 1;
   const raw = versioned.success ? versioned.data.data : json;
+  // V1 规格里 first_mes 必填。只看 name 会把 ST 预设这类也带 name 的 JSON 当成卡
+  if (sourceVersion === 1 && !(typeof raw === "object" && raw !== null && "first_mes" in raw)) {
+    throw new CardImportError("invalid_card", "no spec and no first_mes");
+  }
 
   const data = cardDataSchema.safeParse(raw);
   if (!data.success) throw new CardImportError("invalid_card", z.prettifyError(data.error));

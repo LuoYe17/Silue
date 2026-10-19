@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "主窗口的默认权限",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "sql:default", "sql:allow-execute"]
 }

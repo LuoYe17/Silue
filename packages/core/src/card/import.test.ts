@@ -78,6 +78,10 @@ describe("parseCardJson", () => {
     expect(card.data.extensions).toEqual({});
   });
 
+  test("没有 spec 也没有 first_mes 的 JSON（比如 ST 预设）不当成卡", () => {
+    expectCode(() => parseCardJson({ name: "预设", temperature: 1, prompts: [] }), "invalid_card");
+  });
+
   test("V2 卡升级成 V3，保留不认识的字段和 extensions", () => {
     const { card, sourceVersion } = parseCardJson(v2Card);
     expect(sourceVersion).toBe(2);

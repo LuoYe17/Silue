@@ -21,7 +21,7 @@ Status: implemented
 
 ### core 的边界（两道检查）
 
-- `packages/core/tsconfig.json` 的 `lib` 只有 `ES2024`，不带 DOM，`types` 为空。core 里一旦用了 `document`、`window`，类型检查就报错。
+- `packages/core/tsconfig.json` 的 `lib` 只有 `ES2024`，不带 DOM，`types` 为空。core 里一旦用了 `document`、`window`，类型检查就报错。各端都有的全局函数（`atob`、`btoa`、`crypto.randomUUID`）在 `src/web-globals.d.ts` 里单独声明。测试文件和 `src/testing/` 要用 `node:sqlite`，由 `tsconfig.test.json`（加 `types: ["node"]`）另外检查，core 的 `typecheck` 两个都跑。
 - `biome.json` 的 `overrides` 对 `packages/core/**` 开启 `noRestrictedImports`，禁止 import `@tauri-apps/*`、`react`、`react-dom`、`@silue/app`、`@silue/worker`。
 
 2026-10-19 在 core 里临时放了一个同时 import `react`、读 `document.title` 的文件，两道检查都报了错，确认有效。
@@ -70,6 +70,8 @@ Status: implemented
 | Rust 的 tauri-build | 2.7.3 |
 | zod（core） | 4.6.7 |
 | fflate（core） | 0.8.3 |
+| @types/node（core，只给测试用） | 26.6.5 |
+| tauri-plugin-sql（Rust，开 `sqlite` 特性）/ @tauri-apps/plugin-sql | 2.6.0 |
 | GitHub Action：actions/checkout | v7.0.1 |
 | GitHub Action：actions/setup-node | v7.1.0 |
 | GitHub Action：Swatinem/rust-cache | v2.9.2 |
