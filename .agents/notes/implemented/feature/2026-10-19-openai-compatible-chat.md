@@ -10,6 +10,16 @@ Status: implemented
 - `/v1/chat/completions`（OpenAI 格式）和 `/v1/messages`（Anthropic 格式）都能用。
 - `max_tokens: 200` 没有生效。只回一个字时，用量里的输出也有 1146 个 token，思考用掉的 token 算在输出里。
 - 流式返回是标准的 OpenAI SSE：文字在 `choices[0].delta.content`，用量在最后一块（`choices` 为空），最后是 `data: [DONE]`。没有返回思考内容，也没有缓存命中数。
+- 首字很慢，而且控制不了。让它写 300 字左右的小说开头（脚本直接请求，不经过 App），记录每块到达的时间：
+
+  | 格式和参数 | 收到响应头 / 第一个字 | 发完 | 输出 token |
+  |---|---|---|---|
+  | OpenAI 格式，默认 | 14.6s | 17.9s | 946 |
+  | OpenAI 格式，`reasoning_effort: "low"` | 14.7s | 16.9s | 1129 |
+  | Anthropic 格式，默认 | 12.3s | 15.1s | 1040 |
+  | Anthropic 格式，`thinking: {type: "disabled"}` | 13.8s | 15.9s | 948 |
+
+  中转站等模型想完才返回响应头，思考过程不传回来，两种格式里控制思考的参数都不起作用。正文本身是分块流式发的，约 2～3 秒发完。
 
 这些是中转站自己的行为，不能当成 Gemini 官方接口的行为。
 
@@ -66,5 +76,5 @@ Status: implemented
   - `http:default` 允许前端请求任意地址。以后做卡片 HTML 沙盒时，沙盒里的内容不能拿到 Tauri 的 IPC（见 [消息里的 HTML](../../proposed/feature/2026-10-19-card-html-sandbox.md)）。
   - 用户名暂时取这段聊天里最后一条用户消息的名字，没有就用「你」。
   - 不发 `max_tokens`，回复长度由模型默认值决定。
-  - 真 App 里这次从发出到出字等了 30 秒以上，没有确认是模型思考慢，还是 HTTP 插件没有边收边交给前端（可能整段收完才交）。
+  - 用这个中转站时，发出后要等十几秒才出字（真 App 里万象卡那次超过 30 秒，提示词有 5158 个 token）。原因在中转站（见上面的计时表）。App 这边是边收边显示的：`tauri-plugin-http` 2.8.3 的 Rust 端每收到一块网络数据（`res.chunk()`）就交给前端一次。界面在还没出字时显示「等待模型回复… N 秒」，让人知道没有卡住。
 - 还没做：思考深度档位（[思考深度](../../proposed/feature/2026-10-19-thinking-depth-levels.md)）、Claude / Gemini / OpenAI / DeepSeek 原生接口、预设和世界书、花费显示、模型列表下拉。

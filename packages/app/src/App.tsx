@@ -30,7 +30,7 @@ import "./App.css";
 
 type CharacterItem = { id: string; card: CharacterCardV3 };
 type View = { messages: Message[]; siblings: Map<string, Message[]> };
-type Streaming = { parentId: string; text: string; reasoning: string };
+type Streaming = { parentId: string; text: string; reasoning: string; startedAt: number };
 
 const EMPTY_PROVIDER: ProviderConfig = { baseUrl: "", model: "", apiKey: "" };
 
@@ -49,6 +49,15 @@ export function App() {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
   const abort = useRef<AbortController>(undefined);
+  const [now, setNow] = useState(Date.now);
+
+  // 还没出字时每秒刷新一次等待秒数：有的中转站要等模型想完才开始返回（实测 15 秒左右）
+  const waiting = Boolean(streaming && !streaming.text);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [waiting]);
 
   useEffect(() => {
     openStore().then(setStore, (err) => setFatal(errorText(err)));
@@ -113,7 +122,7 @@ export function App() {
 
     const controller = new AbortController();
     abort.current = controller;
-    const state: Streaming = { parentId, text: "", reasoning: "" };
+    const state: Streaming = { parentId, text: "", reasoning: "", startedAt: Date.now() };
     let usage: Usage | undefined;
     setStreaming({ ...state });
     try {
@@ -386,7 +395,13 @@ export function App() {
           {streaming && (
             <article className="message assistant">
               <div className="meta">
-                <span className="name">{t("chat.generating")}</span>
+                <span className="name">
+                  {streaming.text
+                    ? t("chat.generating")
+                    : t("chat.waiting", {
+                        seconds: Math.max(0, Math.round((now - streaming.startedAt) / 1000)),
+                      })}
+                </span>
                 <button type="button" className="link" onClick={() => abort.current?.abort()}>
                   {t("chat.stop")}
                 </button>

@@ -20,6 +20,7 @@ export const zhCN = {
   "chat.regenerate": "重新生成",
   "chat.stop": "停止",
   "chat.generating": "正在生成…",
+  "chat.waiting": "等待模型回复… {seconds} 秒",
   "chat.usage": "输入 {input}（缓存命中 {cached}）· 输出 {output}",
   "chat.cacheUnknown": "未知",
   "settings.title": "模型设置",

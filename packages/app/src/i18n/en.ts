@@ -21,6 +21,7 @@ export const en: Record<MessageKey, string> = {
   "chat.regenerate": "Regenerate",
   "chat.stop": "Stop",
   "chat.generating": "Generating…",
+  "chat.waiting": "Waiting for the model… {seconds}s",
   "chat.usage": "Input {input} (cache hits {cached}) · Output {output}",
   "chat.cacheUnknown": "unknown",
   "settings.title": "Model settings",
