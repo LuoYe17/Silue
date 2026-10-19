@@ -35,6 +35,12 @@ export const en: Record<MessageKey, string> = {
   "persona.title": "My persona",
   "persona.name": "Name (replaces {{user}}; empty uses the name in the chat)",
   "persona.description": "Description (sent to the model before the character description)",
+  "preset.title": "Prompt preset",
+  "preset.active": "Active preset",
+  "preset.none": "No preset (built-in order)",
+  "preset.import": "Import SillyTavern preset",
+  "preset.moved":
+    "These depth entries were moved after the chat history so the cache hits more often: {names}",
   "settings.title": "Model settings",
   "settings.profile": "Profile",
   "settings.newProfile": "+ New profile",
@@ -74,5 +80,7 @@ export const en: Record<MessageKey, string> = {
   "error.provider.http": "The model API returned {status}: {detail}",
   "error.provider.api": "The model API reported an error: {detail}",
   "error.provider.bad_response": "The model API returned something unreadable: {detail}",
+  "error.preset.invalid_json": "The preset file is not valid JSON.",
+  "error.preset.invalid_preset": "This is not a SillyTavern chat completion preset (no prompts).",
   "error.unknown": "Something went wrong: {message}",
 };

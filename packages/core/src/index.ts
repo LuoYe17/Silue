@@ -13,6 +13,7 @@ export * from "./llm/openai.ts";
 export * from "./llm/profiles.ts";
 export * from "./llm/thinking.ts";
 export * from "./prompt/chat-prompt.ts";
+export * from "./prompt/preset.ts";
 export * from "./prompt/regex.ts";
 export * from "./store/doc-store.ts";
 export type { SqlDriver, SqlValue } from "./store/driver.ts";

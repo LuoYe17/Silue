@@ -46,7 +46,7 @@ ST 的世界书条目按关键词触发，插到聊天记录中间某个深度�
 
 ### 已经落地的部分
 
-角色卡自带世界书的放置规则（常驻的进第 1 段，触发的和 @D 的放第 4 段）已经做了，见 [角色卡世界书](../../implemented/feature/2026-10-19-card-lorebook.md)。官方 DeepSeek 上第二轮缓存命中 86% 的实测见 [思考深度档位](../../implemented/feature/2026-10-19-thinking-levels.md)。
+角色卡自带世界书的放置规则（常驻的进第 1 段，触发的和 @D 的放第 4 段）已经做了，见 [角色卡世界书](../../implemented/feature/2026-10-19-card-lorebook.md)。官方 DeepSeek 上第二轮缓存命中 86% 的实测见 [思考深度档位](../../implemented/feature/2026-10-19-thinking-levels.md)。导入 ST 预设、带深度的条目挪到第 4 段、用户人设放第 1 段也做了，见 [ST 预设](../../implemented/feature/2026-10-19-st-preset.md)、[用户人设](../../implemented/feature/2026-10-19-user-persona.md)；把单个条目改回原位置还没做。正则按深度删旧内容只让最近几条变化，见 [角色卡正则](../../implemented/feature/2026-10-19-card-regex.md)。
 
 ## Alternatives considered
 

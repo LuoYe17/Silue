@@ -22,7 +22,7 @@ Status: proposed
 
 ### 已经落地的部分
 
-OpenAI 兼容请求和角色卡提示词的标准答案、缓存前缀测试已经有了，见 [OpenAI 兼容接口](../../implemented/feature/2026-10-19-openai-compatible-chat.md)。更新命令是 `npm test -- -u`。
+OpenAI 兼容请求和角色卡提示词的标准答案、缓存前缀测试已经有了，见 [OpenAI 兼容接口](../../implemented/feature/2026-10-19-openai-compatible-chat.md)。更新命令是 `npm test -- -u`。之后世界书、正则、预设各加了一份（`packages/core/src/prompt/__golden__/` 下的 `lorebook-card.json`、`regex-card.json`、`preset-card.json`）。
 
 ## Alternatives considered
 

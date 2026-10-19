@@ -34,6 +34,11 @@ export const zhCN = {
   "persona.title": "我的人设",
   "persona.name": "名字（替换 {{user}}，不填就用聊天记录里的）",
   "persona.description": "描述（发给模型，放在角色描述前面）",
+  "preset.title": "提示词预设",
+  "preset.active": "当前预设",
+  "preset.none": "不用预设（内置顺序）",
+  "preset.import": "导入 SillyTavern 预设",
+  "preset.moved": "这些带深度的条目挪到了聊天记录之后，让缓存更容易命中：{names}",
   "settings.title": "模型设置",
   "settings.profile": "配置",
   "settings.newProfile": "＋ 新建配置",
@@ -70,6 +75,8 @@ export const zhCN = {
   "error.provider.http": "模型接口返回 {status}：{detail}",
   "error.provider.api": "模型接口报错：{detail}",
   "error.provider.bad_response": "模型接口返回了读不懂的内容：{detail}",
+  "error.preset.invalid_json": "预设文件里的 JSON 是坏的。",
+  "error.preset.invalid_preset": "这不是 SillyTavern 的聊天补全预设（缺少 prompts）。",
   "error.unknown": "出错了：{message}",
 } as const;
 

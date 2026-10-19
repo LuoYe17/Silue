@@ -1,5 +1,6 @@
 // 最简界面：用来在真 App 里把存储层和模型调用跑一遍（导入卡、导入聊天、发消息、生成回复、切换备选）。
 import {
+  activePreset,
   appendMessage,
   applyRegexScripts,
   buildChatPrompt,
@@ -14,19 +15,24 @@ import {
   editMessage,
   getCharacter,
   importCard,
+  importPreset,
   importStChat,
   importStChatToStore,
   listCharacters,
   listChats,
+  listPresets,
   loadChat,
   loadPersona,
   type Message,
+  movedPresetPrompts,
   type Persona,
+  type PresetItem,
   type ProviderProfile,
   reasoningEffort,
   replaceMacros,
   savePersona,
   selectBranch,
+  setActivePreset,
   setActiveProviderProfile,
   siblingsOf,
   THINKING_LEVELS,
@@ -76,6 +82,10 @@ export function App() {
   const [personaForm, setPersonaForm] = useState<Persona>(persona);
   const [personaOpen, setPersonaOpen] = useState(false);
   const [personaSaved, setPersonaSaved] = useState(false);
+  const [presets, setPresets] = useState<PresetItem[]>([]);
+  /** 当前选中的预设和它被挪到聊天记录之后的条目名 */
+  const [preset, setPreset] = useState<{ id: string; moved: string[] }>();
+  const [presetOpen, setPresetOpen] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
   const [editing, setEditing] = useState<{ id: string; text: string }>();
   const [deleting, setDeleting] = useState<string>();
@@ -119,6 +129,14 @@ export function App() {
     setView({ messages, siblings: new Map(messages.map((m) => [m.id, siblingsOf(tree, m)])) });
   }, []);
 
+  const refreshPresets = useCallback(async (s: DocStore) => {
+    const [list, active] = await Promise.all([listPresets(s), activePreset(s)]);
+    setPresets(list);
+    setPreset(
+      active && { id: active.id, moved: movedPresetPrompts(active.preset).map((p) => p.name) },
+    );
+  }, []);
+
   const refreshProviders = useCallback(async (s: DocStore) => {
     const { profiles, active } = await loadProviders(s);
     setProfiles(profiles);
@@ -131,6 +149,7 @@ export function App() {
     if (!store) return;
     void refreshCharacters(store);
     refreshProviders(store).catch((err) => setError(errorText(err)));
+    refreshPresets(store).catch((err) => setError(errorText(err)));
     loadPersona(store).then(
       (p) => {
         setPersona(p);
@@ -138,7 +157,7 @@ export function App() {
       },
       (err) => setError(errorText(err)),
     );
-  }, [store, refreshCharacters, refreshProviders]);
+  }, [store, refreshCharacters, refreshProviders, refreshPresets]);
   useEffect(() => {
     if (store) void refreshChats(store, characterId);
   }, [store, characterId, refreshChats]);
@@ -156,9 +175,10 @@ export function App() {
       setSettingsOpen(true);
       throw new Error(t("settings.missing"));
     }
-    const [loaded, character] = await Promise.all([
+    const [loaded, character, active] = await Promise.all([
       loadChat(store, chatId),
       getCharacter(store, characterId),
+      activePreset(store),
     ]);
     if (!loaded || !character) return;
     const path = toActivePath(buildTree(loaded.messages), parentId);
@@ -167,6 +187,7 @@ export function App() {
       userName: userNameOf(path),
       persona: persona.description,
       history: path,
+      preset: active?.preset,
     });
 
     const controller = new AbortController();
@@ -223,6 +244,24 @@ export function App() {
       const id = await importStChatToStore(store, characterId, importStChat(await file.text()));
       await refreshChats(store, characterId);
       setChatId(id);
+    });
+  };
+
+  const onImportPreset = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    void run(async () => {
+      const id = await importPreset(store, await file.text(), file.name.replace(/\.json$/i, ""));
+      await setActivePreset(store, id);
+      await refreshPresets(store);
+    });
+  };
+
+  const onPickPreset = (id: string) => {
+    void run(async () => {
+      await setActivePreset(store, id);
+      await refreshPresets(store);
     });
   };
 
@@ -504,6 +543,35 @@ export function App() {
             </button>
             {personaSaved && <span className="hint">{t("settings.saved")}</span>}
           </form>
+        )}
+        <button
+          type="button"
+          className="item settings-toggle"
+          onClick={() => setPresetOpen(!presetOpen)}
+        >
+          {t("preset.title")}
+        </button>
+        {presetOpen && (
+          <div className="settings">
+            <label>
+              {t("preset.active")}
+              <select value={preset?.id ?? ""} onChange={(e) => onPickPreset(e.target.value)}>
+                <option value="">{t("preset.none")}</option>
+                {presets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {preset && preset.moved.length > 0 && (
+              <span className="hint">{t("preset.moved", { names: preset.moved.join("、") })}</span>
+            )}
+            <label className="button">
+              {t("preset.import")}
+              <input type="file" accept=".json" hidden onChange={onImportPreset} />
+            </label>
+          </div>
         )}
       </aside>
 
