@@ -1,0 +1,1 @@
+{"model":"m","messages":[{"role":"system","content":"Write 小橘's next reply in a fictional chat between 小橘 and 阿叶."},{"role":"assistant","content":"喵。\n"},{"role":"user","content":"摸摸头「乖」"},{"role":"assistant","content":"喵～\n<status>饱腹：70</status>"},{"role":"user","content":"继续"}],"stream":true,"stream_options":{"include_usage":true}}

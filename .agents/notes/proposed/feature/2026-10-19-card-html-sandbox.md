@@ -19,6 +19,10 @@ Status: proposed
 - **JS**：第一版的 JS 只能改自己那块消息的显示（比如点按钮切换面板），不提供任何读写聊天变量、调用模型的接口。
 - **插件系统**：第二版再做。等内置功能稳定了，参考 Tavo 插件的能力（监听消息事件、读写变量、调用模型、侧边栏按钮、往聊天页里加界面）来定接口。
 
+### 已经落地的部分
+
+不带 JS 的那一半先做了，见 [角色卡正则](../../implemented/feature/2026-10-19-card-regex.md)：正则改出来的 HTML 放进 `<iframe sandbox="allow-same-origin" srcdoc=…>`，不给 `allow-scripts`；外层用 ResizeObserver 量高度；`style-src` 关掉 Tauri 的哈希注入，让卡片的内联样式生效。万象卡的状态栏在开发模式的真 App 里显示正常。自定义协议、卡片 JS、只渲染屏幕上的消息都还没做。
+
 ## Alternatives considered
 
 - **只支持 Markdown，或者只支持不带 JS 的 HTML** — 最强的理由：不需要沙盒，也没有安全问题，实现最简单。否掉的原因：美化卡是中文 RP 圈的主流，开发者选了完整支持。

@@ -1,10 +1,12 @@
 // 最简界面：用来在真 App 里把存储层和模型调用跑一遍（导入卡、导入聊天、发消息、生成回复、切换备选）。
 import {
   appendMessage,
+  applyRegexScripts,
   buildChatPrompt,
   buildTree,
   type CharacterCardV3,
   type Chat,
+  cardRegexScripts,
   createCharacter,
   createChat,
   type DocStore,
@@ -20,6 +22,7 @@ import {
   type Message,
   type ProviderProfile,
   reasoningEffort,
+  replaceMacros,
   selectBranch,
   setActiveProviderProfile,
   siblingsOf,
@@ -31,6 +34,7 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { openStore } from "./db.ts";
 import { errorText, t } from "./i18n/index.ts";
+import { MessageHtml } from "./MessageHtml.tsx";
 import {
   deleteProvider,
   EMPTY_FORM,
@@ -294,6 +298,8 @@ export function App() {
     });
   };
 
+  const card = characters.find((c) => c.id === characterId)?.card.data;
+  const scripts = card ? cardRegexScripts(card) : [];
   // 生成中只显示到要接回复的那条为止：从中间某条重新生成时，后面的旧消息属于另一条分支
   const shown = streaming
     ? view.messages.slice(0, view.messages.findIndex((m) => m.id === streaming.parentId) + 1)
@@ -466,7 +472,7 @@ export function App() {
         {error && <div className="error">{error}</div>}
         {!chatId && <p className="hint center">{t("chat.empty")}</p>}
         <div className="messages">
-          {shown.map((m) => {
+          {shown.map((m, i) => {
             const siblings = view.siblings.get(m.id) ?? [m];
             const index = siblings.findIndex((s) => s.id === m.id);
             const usage = m.usage as Usage | undefined;
@@ -558,7 +564,13 @@ export function App() {
                     </div>
                   </form>
                 ) : (
-                  <div className="content">{m.content}</div>
+                  <MessageBody
+                    message={m}
+                    depth={shown.length - 1 - i}
+                    scripts={scripts}
+                    charName={card?.name ?? m.name}
+                    userName={shown.findLast((x) => x.role === "user")?.name ?? t("chat.you")}
+                  />
                 )}
                 {usage && (
                   <div className="usage">
@@ -618,5 +630,29 @@ export function App() {
         )}
       </main>
     </div>
+  );
+}
+
+/** 显示前先过角色卡里只改显示的正则；改出了 HTML 就放进沙盒 iframe，没改就按纯文本显示 */
+function MessageBody(props: {
+  message: Message;
+  depth: number;
+  scripts: ReturnType<typeof cardRegexScripts>;
+  charName: string;
+  userName: string;
+}) {
+  const { message: m, charName, userName } = props;
+  const regexed = applyRegexScripts(props.scripts, m.content, {
+    target: "display",
+    role: m.role,
+    depth: props.depth,
+    charName,
+    userName,
+  });
+  const text = replaceMacros(regexed, charName, userName);
+  return regexed === m.content ? (
+    <div className="content">{text}</div>
+  ) : (
+    <MessageHtml html={text} />
   );
 }

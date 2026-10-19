@@ -293,3 +293,9 @@ ul {
 .editor .actions {
   align-items: center;
 }
+
+.message-html {
+  display: block;
+  width: 100%;
+  border: 0;
+}
