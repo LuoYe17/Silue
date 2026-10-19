@@ -30,7 +30,7 @@ DeepSeek 官方 `/models` 接口也返回了每个模型支持的档位：`deeps
   | 最大 | `max` | `high`（没有最大档） | `max` |
 
 - `reasoning_effort` 放在请求体最后，`default` 时请求体和加这个功能之前逐字相同（已有的两份标准答案没有变）。
-- 档位跟接口地址、模型名一起存在 `settings` 集合，会同步。读出来的值不在档位列表里（比如别的设备上更新的版本写的）时按 `default` 处理。
+- 档位是每套接口配置的一个字段（[多套接口配置](2026-10-19-provider-profiles.md)），会同步。读出来的值不在档位列表里（比如别的设备上更新的版本写的）时按 `default` 处理。
 - 设置里的下拉框下面显示实际发送的值，比如「实际发送 reasoning_effort: high」，选「中」接 DeepSeek 时能看出来实际是 `high`。
 - 用量那一行在接口返回思考 token 数时加上「（其中思考 N）」。
 - 标准答案：`packages/core/src/llm/__golden__/thinking-levels.txt` 列出三家每个档位的请求体结尾。

@@ -18,9 +18,10 @@ import {
   listChats,
   loadChat,
   type Message,
-  type ProviderConfig,
+  type ProviderProfile,
   reasoningEffort,
   selectBranch,
+  setActiveProviderProfile,
   siblingsOf,
   THINKING_LEVELS,
   type ThinkingLevel,
@@ -30,14 +31,20 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { openStore } from "./db.ts";
 import { errorText, t } from "./i18n/index.ts";
-import { isProviderReady, loadProvider, saveProvider, streamChat } from "./provider.ts";
+import {
+  deleteProvider,
+  EMPTY_FORM,
+  isProviderReady,
+  loadProviders,
+  type ProviderForm,
+  saveProvider,
+  streamChat,
+} from "./provider.ts";
 import "./App.css";
 
 type CharacterItem = { id: string; card: CharacterCardV3 };
 type View = { messages: Message[]; siblings: Map<string, Message[]> };
 type Streaming = { parentId: string; text: string; reasoning: string; startedAt: number };
-
-const EMPTY_PROVIDER: ProviderConfig = { baseUrl: "", model: "", apiKey: "", thinking: "default" };
 
 export function App() {
   const [store, setStore] = useState<DocStore>();
@@ -49,7 +56,12 @@ export function App() {
   const [chatId, setChatId] = useState<string>();
   const [view, setView] = useState<View>({ messages: [], siblings: new Map() });
   const [draft, setDraft] = useState("");
-  const [provider, setProvider] = useState<ProviderConfig>(EMPTY_PROVIDER);
+  /** 当前在用的配置（已保存的），生成回复用它 */
+  const [provider, setProvider] = useState<ProviderForm>();
+  /** 设置面板里正在编辑的配置，保存前不影响生成 */
+  const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
+  const [profiles, setProfiles] = useState<ProviderProfile[]>([]);
+  const [deletingProvider, setDeletingProvider] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
@@ -95,11 +107,19 @@ export function App() {
     setView({ messages, siblings: new Map(messages.map((m) => [m.id, siblingsOf(tree, m)])) });
   }, []);
 
+  const refreshProviders = useCallback(async (s: DocStore) => {
+    const { profiles, active } = await loadProviders(s);
+    setProfiles(profiles);
+    setProvider(active);
+    setForm(active ?? EMPTY_FORM);
+    setDeletingProvider(false);
+  }, []);
+
   useEffect(() => {
     if (!store) return;
     void refreshCharacters(store);
-    loadProvider(store).then(setProvider, (err) => setError(errorText(err)));
-  }, [store, refreshCharacters]);
+    refreshProviders(store).catch((err) => setError(errorText(err)));
+  }, [store, refreshCharacters, refreshProviders]);
   useEffect(() => {
     if (store) void refreshChats(store, characterId);
   }, [store, characterId, refreshChats]);
@@ -113,7 +133,7 @@ export function App() {
   /** 生成一条回复，挂在 parentId 下面（发新消息后、重新生成时）。中途停止或出错，已收到的部分照样保存 */
   const generate = async (parentId: string) => {
     if (!chatId || !characterId) return;
-    if (!isProviderReady(provider)) {
+    if (!provider || !isProviderReady(provider)) {
       setSettingsOpen(true);
       throw new Error(t("settings.missing"));
     }
@@ -249,9 +269,28 @@ export function App() {
 
   const onSaveSettings = () => {
     void run(async () => {
-      await saveProvider(store, provider);
-      setProvider(await loadProvider(store));
+      await saveProvider(store, form);
+      await refreshProviders(store);
       setSettingsSaved(true);
+    });
+  };
+
+  /** 下拉框选一套配置就切过去用；选「新建」只清空表单，保存后才生效 */
+  const onPickProvider = (id: string) => {
+    setSettingsSaved(false);
+    if (id === "") return setForm(EMPTY_FORM);
+    void run(async () => {
+      await setActiveProviderProfile(store, id);
+      await refreshProviders(store);
+    });
+  };
+
+  const onDeleteProvider = () => {
+    const id = form.id;
+    if (!id) return;
+    void run(async () => {
+      await deleteProvider(store, id);
+      await refreshProviders(store);
     });
   };
 
@@ -259,7 +298,7 @@ export function App() {
   const shown = streaming
     ? view.messages.slice(0, view.messages.findIndex((m) => m.id === streaming.parentId) + 1)
     : view.messages;
-  const effort = reasoningEffort(provider.baseUrl, provider.thinking ?? "default");
+  const effort = reasoningEffort(form.baseUrl, form.thinking ?? "default");
 
   return (
     <div className="layout">
@@ -307,35 +346,51 @@ export function App() {
             }}
           >
             <label>
+              {t("settings.profile")}
+              <select value={form.id ?? ""} onChange={(e) => onPickProvider(e.target.value)}>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name || p.model || p.baseUrl}
+                  </option>
+                ))}
+                <option value="">{t("settings.newProfile")}</option>
+              </select>
+            </label>
+            <label>
+              {t("settings.name")}
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </label>
+            <label>
               {t("settings.baseUrl")}
               <input
-                value={provider.baseUrl}
+                value={form.baseUrl}
                 placeholder="https://api.example.com"
-                onChange={(e) => setProvider({ ...provider, baseUrl: e.target.value })}
+                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
               />
             </label>
             <label>
               {t("settings.model")}
               <input
-                value={provider.model}
-                onChange={(e) => setProvider({ ...provider, model: e.target.value })}
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
               />
             </label>
             <label>
               {t("settings.apiKey")}
               <input
                 type="password"
-                value={provider.apiKey}
-                onChange={(e) => setProvider({ ...provider, apiKey: e.target.value })}
+                value={form.apiKey}
+                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
               />
             </label>
             <label>
               {t("settings.thinking")}
               <select
-                value={provider.thinking ?? "default"}
-                onChange={(e) =>
-                  setProvider({ ...provider, thinking: e.target.value as ThinkingLevel })
-                }
+                value={form.thinking ?? "default"}
+                onChange={(e) => setForm({ ...form, thinking: e.target.value as ThinkingLevel })}
               >
                 {THINKING_LEVELS.map((level) => (
                   <option key={level} value={level}>
@@ -353,6 +408,25 @@ export function App() {
               {t("settings.save")}
             </button>
             {settingsSaved && <span className="hint">{t("settings.saved")}</span>}
+            {form.id &&
+              (deletingProvider ? (
+                <span className="actions">
+                  <button type="button" className="link danger" onClick={onDeleteProvider}>
+                    {t("settings.confirmDeleteProfile")}
+                  </button>
+                  <button type="button" className="link" onClick={() => setDeletingProvider(false)}>
+                    {t("chat.cancel")}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="link danger"
+                  onClick={() => setDeletingProvider(true)}
+                >
+                  {t("settings.deleteProfile")}
+                </button>
+              ))}
           </form>
         )}
       </aside>

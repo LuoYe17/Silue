@@ -9,6 +9,7 @@ export * from "./chat/import-st.ts";
 export * from "./chat/repo.ts";
 export * from "./chat/tree.ts";
 export * from "./llm/openai.ts";
+export * from "./llm/profiles.ts";
 export * from "./llm/thinking.ts";
 export * from "./prompt/chat-prompt.ts";
 export * from "./store/doc-store.ts";

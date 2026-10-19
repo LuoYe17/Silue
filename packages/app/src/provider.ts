@@ -1,46 +1,104 @@
-// 模型接口的设置和调用。接口地址、模型名存在数据库里（以后跟着同步），API Key 存在系统凭据管理器里。
+// 模型接口的设置和调用。配置（名字、地址、模型、思考深度）存在数据库里，以后跟着同步；
+// API Key 按配置 id 存在系统凭据管理器里，不同步。
 import {
+  activeProviderProfile,
   type ChatMessage,
   type DocStore,
+  listProviderProfiles,
   openAiChatRequest,
   type ProviderConfig,
   ProviderError,
+  type ProviderProfile,
   parseOpenAiEvent,
   providerHttpError,
+  removeProviderProfile,
   SseDecoder,
   type StreamEvent,
+  saveProviderProfile,
+  setActiveProviderProfile,
   THINKING_LEVELS,
-  type ThinkingLevel,
 } from "@silue/core";
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
 
-const SETTINGS = "settings";
-const PROVIDER = "provider";
-const API_KEY_SECRET = "provider.apiKey";
+// 旧版只有一套配置：数据库 settings/provider 加凭据 provider.apiKey。第一次打开时搬成一套命名配置
+const LEGACY_SETTINGS = "settings";
+const LEGACY_PROVIDER = "provider";
+const LEGACY_SECRET = "provider.apiKey";
+// 搬过来的配置用固定 id：开发模式下 React 会把启动逻辑跑两遍，两次搬迁同时进行也只会落到同一套上
+const MIGRATED_ID = "migrated";
 
-type ProviderSettings = { baseUrl: string; model: string; thinking: ThinkingLevel };
+const secretName = (profileId: string) => `provider.${profileId}.apiKey`;
 
-export async function loadProvider(store: DocStore): Promise<ProviderConfig> {
-  const doc = await store.get<ProviderSettings>(SETTINGS, PROVIDER);
-  const apiKey = await invoke<string | null>("secret_get", { name: API_KEY_SECRET });
-  // 设置会同步，别的设备（或更新的版本）写来的档位不认识时按 default 处理
-  const thinking = THINKING_LEVELS.find((level) => level === doc?.data.thinking) ?? "default";
-  return {
-    baseUrl: doc?.data.baseUrl ?? "",
-    model: doc?.data.model ?? "",
-    apiKey: apiKey ?? "",
-    thinking,
-  };
+/** 设置表单：一套配置加它的 API Key。id 为空表示新建 */
+export interface ProviderForm extends ProviderConfig {
+  id?: string;
+  name: string;
 }
 
-export async function saveProvider(store: DocStore, config: ProviderConfig): Promise<void> {
-  await store.put<ProviderSettings>(SETTINGS, PROVIDER, {
-    baseUrl: config.baseUrl.trim(),
-    model: config.model.trim(),
-    thinking: config.thinking ?? "default",
+export const EMPTY_FORM: ProviderForm = {
+  name: "",
+  baseUrl: "",
+  model: "",
+  apiKey: "",
+  thinking: "default",
+};
+
+async function migrateLegacy(store: DocStore): Promise<void> {
+  const legacy = await store.get<Partial<ProviderConfig>>(LEGACY_SETTINGS, LEGACY_PROVIDER);
+  if (!legacy) return;
+  if ((await listProviderProfiles(store)).every((p) => p.id === MIGRATED_ID)) {
+    const model = String(legacy.data.model ?? "");
+    const id = await saveProviderProfile(store, {
+      id: MIGRATED_ID,
+      name: model,
+      baseUrl: String(legacy.data.baseUrl ?? ""),
+      model,
+      thinking: THINKING_LEVELS.find((l) => l === legacy.data.thinking) ?? "default",
+    });
+    const key = await invoke<string | null>("secret_get", { name: LEGACY_SECRET });
+    if (key) await invoke("secret_set", { name: secretName(id), value: key });
+    await setActiveProviderProfile(store, id);
+  }
+  await invoke("secret_set", { name: LEGACY_SECRET, value: "" });
+  await store.remove(LEGACY_SETTINGS, LEGACY_PROVIDER);
+}
+
+/** 所有配置和当前那套（带 API Key）；一套都没有时 active 是 undefined */
+export async function loadProviders(
+  store: DocStore,
+): Promise<{ profiles: ProviderProfile[]; active: ProviderForm | undefined }> {
+  await migrateLegacy(store);
+  const [profiles, active] = await Promise.all([
+    listProviderProfiles(store),
+    activeProviderProfile(store),
+  ]);
+  return { profiles, active: active && (await withKey(active)) };
+}
+
+export async function withKey(profile: ProviderProfile): Promise<ProviderForm> {
+  const apiKey = await invoke<string | null>("secret_get", { name: secretName(profile.id) });
+  const { id, name, baseUrl, model, thinking } = profile;
+  return { id, name, baseUrl, model, thinking, apiKey: apiKey ?? "" };
+}
+
+/** 保存并设为当前配置，返回配置 id。名字没填时用模型名 */
+export async function saveProvider(store: DocStore, form: ProviderForm): Promise<string> {
+  const id = await saveProviderProfile(store, {
+    ...(form.id && { id: form.id }),
+    name: form.name.trim() || form.model.trim(),
+    baseUrl: form.baseUrl,
+    model: form.model,
+    thinking: form.thinking ?? "default",
   });
-  await invoke("secret_set", { name: API_KEY_SECRET, value: config.apiKey.trim() });
+  await invoke("secret_set", { name: secretName(id), value: form.apiKey.trim() });
+  await setActiveProviderProfile(store, id);
+  return id;
+}
+
+export async function deleteProvider(store: DocStore, id: string): Promise<void> {
+  await removeProviderProfile(store, id);
+  await invoke("secret_set", { name: secretName(id), value: "" });
 }
 
 export const isProviderReady = (c: ProviderConfig) => Boolean(c.baseUrl && c.model && c.apiKey);
