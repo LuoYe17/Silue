@@ -1,0 +1,17 @@
+{
+  "name": "silue",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "verify-agent-note-tree": "node .agents/skills/write-notes-like-deepseek/scripts/verify-agent-note-tree.ts",
+    "verify-agent-note-format": "node .agents/skills/write-notes-like-deepseek/scripts/verify-agent-note-format.ts",
+    "verify-archived": "node .agents/skills/write-notes-like-deepseek/scripts/verify-archived-agent-notes.ts",
+    "verify-notes": "npm run verify-agent-note-tree && npm run verify-agent-note-format && npm run verify-archived",
+    "archive-agent-note": "node .agents/skills/write-notes-like-deepseek/scripts/archive-agent-note.ts",
+    "init-board": "node .agents/skills/write-notes-like-deepseek/scripts/build-board.ts --init board.html \"Silue 决策看板\""
+  }
+}
