@@ -12,6 +12,13 @@ rust-version = "1.90"
 name = "silue_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# 开发版：依赖不生成调试信息，自己的代码只保留行号（报错堆栈够用），编译和链接都更快
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [build-dependencies]
 tauri-build = { version = "=2.7.3", features = [] }
 

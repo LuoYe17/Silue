@@ -1,0 +1,4 @@
+# 用 Rust 自带的 lld 代替 MSVC 的 link.exe，链接更快。放在仓库根目录，
+# 这样在根目录用 --manifest-path 跑 cargo（npm run check:rust、CI）和在 src-tauri 里跑（tauri dev）都能读到。
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
