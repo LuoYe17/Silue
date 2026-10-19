@@ -18,6 +18,18 @@ export const en: Record<MessageKey, string> = {
   "chat.branch": "{index}/{total}",
   "chat.previous": "Previous alternative",
   "chat.next": "Next alternative",
+  "chat.regenerate": "Regenerate",
+  "chat.stop": "Stop",
+  "chat.generating": "Generating…",
+  "chat.usage": "Input {input} (cache hits {cached}) · Output {output}",
+  "chat.cacheUnknown": "unknown",
+  "settings.title": "Model settings",
+  "settings.baseUrl": "API base URL",
+  "settings.model": "Model",
+  "settings.apiKey": "API key (kept in the system credential store)",
+  "settings.save": "Save",
+  "settings.saved": "Saved",
+  "settings.missing": "Fill in the API base URL, model and API key in Model settings first.",
   "error.card.unknown_format":
     "Unrecognized file. Only PNG, JSON and CHARX character cards are supported.",
   "error.card.invalid_json": "The JSON in this file is broken.",
@@ -33,5 +45,8 @@ export const en: Record<MessageKey, string> = {
   "error.chat.invalid_header":
     "The header line is missing. This is not a chat exported from SillyTavern or Tavo.",
   "error.chat.invalid_message": "The message on line {line} of the chat file is malformed.",
+  "error.provider.http": "The model API returned {status}: {detail}",
+  "error.provider.api": "The model API reported an error: {detail}",
+  "error.provider.bad_response": "The model API returned something unreadable: {detail}",
   "error.unknown": "Something went wrong: {message}",
 };

@@ -41,7 +41,7 @@ Status: implemented
 
 - TypeScript 统一配置在 `tsconfig.base.json`：`strict`、`noUncheckedIndexedAccess`、`verbatimModuleSyntax`、`erasableSyntaxOnly`，`moduleResolution: bundler`。
   - 开 `erasableSyntaxOnly` 是为了让 Node 24 能直接运行 core 的 `.ts` 源码，方便拿真实文件做一次性检查。Node 自带的类型擦除不支持构造函数参数属性（`constructor(readonly x)`）、`enum` 这类会生成代码的语法，用到就报 `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`。
-- Biome 配置：2 空格缩进，行宽 100，双引号。`.agents/skills` 是从外部复制进来的，不检查。
+- Biome 配置：2 空格缩进，行宽 100，双引号。`.agents/skills` 是从外部复制进来的，不检查。`**/__golden__` 是逐字比较的标准答案，也不检查（格式化会改掉它）。
 
 ### CI（`.github/workflows/ci.yml`）
 
@@ -72,6 +72,8 @@ Status: implemented
 | fflate（core） | 0.8.3 |
 | @types/node（core，只给测试用） | 26.6.5 |
 | tauri-plugin-sql（Rust，开 `sqlite` 特性）/ @tauri-apps/plugin-sql | 2.6.0 |
+| tauri-plugin-http / @tauri-apps/plugin-http | 2.8.3（crates.io 上更新的 3.0.0-alpha.3 不是稳定版） |
+| keyring（Rust） | 4.2.0 |
 | GitHub Action：actions/checkout | v7.0.1 |
 | GitHub Action：actions/setup-node | v7.1.0 |
 | GitHub Action：Swatinem/rust-cache | v2.9.2 |

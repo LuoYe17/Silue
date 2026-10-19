@@ -123,10 +123,20 @@ export async function loadActivePath(store: DocStore, chatId: string): Promise<M
 export async function appendMessage(
   store: DocStore,
   chatId: string,
-  input: { parentId: string | null; role: Role; name: string; content: string },
+  input: {
+    parentId: string | null;
+    role: Role;
+    name: string;
+    content: string;
+    /** 附加字段，比如生成时用的模型、用量、思考内容；不能覆盖上面的基本字段 */
+    extra?: Record<string, unknown>;
+  },
 ): Promise<Message> {
   const id = crypto.randomUUID();
-  const data = messageData(store, chatId, input.parentId, input.role, input.name, input.content);
+  const data = {
+    ...input.extra,
+    ...messageData(store, chatId, input.parentId, input.role, input.name, input.content),
+  };
   await store.put(MESSAGES, id, data);
   await store.put<ChatData>(CHATS, chatId, { leafId: id });
   return { ...data, id };

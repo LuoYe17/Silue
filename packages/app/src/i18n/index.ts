@@ -1,4 +1,4 @@
-import { CardImportError, ChatImportError } from "@silue/core";
+import { CardImportError, ChatImportError, ProviderError } from "@silue/core";
 import { en } from "./en.ts";
 import { type MessageKey, zhCN } from "./zh-CN.ts";
 
@@ -17,5 +17,8 @@ export function t(key: MessageKey, params: Record<string, string | number> = {})
 export function errorText(err: unknown): string {
   if (err instanceof CardImportError) return t(`error.card.${err.code}`);
   if (err instanceof ChatImportError) return t(`error.chat.${err.code}`, { line: err.line ?? "?" });
+  if (err instanceof ProviderError) {
+    return t(`error.provider.${err.code}`, { status: err.status ?? "", detail: err.detail });
+  }
   return t("error.unknown", { message: err instanceof Error ? err.message : String(err) });
 }

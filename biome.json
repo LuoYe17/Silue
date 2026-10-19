@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!.agents/skills", "!**/src-tauri/gen", "!**/dist"]
+    "includes": ["**", "!.agents/skills", "!**/src-tauri/gen", "!**/dist", "!**/__golden__"]
   },
   "formatter": {
     "enabled": true,
