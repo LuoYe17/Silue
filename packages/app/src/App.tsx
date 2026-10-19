@@ -8,6 +8,8 @@ import {
   createCharacter,
   createChat,
   type DocStore,
+  deleteBranch,
+  editMessage,
   getCharacter,
   importCard,
   importStChat,
@@ -51,6 +53,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [streaming, setStreaming] = useState<Streaming>();
+  const [editing, setEditing] = useState<{ id: string; text: string }>();
+  const [deleting, setDeleting] = useState<string>();
   const abort = useRef<AbortController>(undefined);
   const [now, setNow] = useState(Date.now);
 
@@ -213,6 +217,26 @@ export function App() {
     void run(() => generate(parentId));
   };
 
+  const onSaveEdit = () => {
+    if (!editing || !chatId) return;
+    const { id, text } = editing;
+    void run(async () => {
+      await editMessage(store, id, text);
+      setEditing(undefined);
+      await refreshView(store, chatId);
+    });
+  };
+
+  /** 删掉这条和它后面的整条分支；当前显示的线被删时切到还在的兄弟分支 */
+  const onDelete = (message: Message) => {
+    if (!chatId || streaming) return;
+    void run(async () => {
+      await deleteBranch(store, chatId, message.id);
+      setDeleting(undefined);
+      await refreshView(store, chatId);
+    });
+  };
+
   const onSwitch = (message: Message, step: number) => {
     const siblings = view.siblings.get(message.id) ?? [];
     const target = siblings[siblings.findIndex((m) => m.id === message.id) + step];
@@ -231,7 +255,10 @@ export function App() {
     });
   };
 
-  const lastId = view.messages[view.messages.length - 1]?.id;
+  // 生成中只显示到要接回复的那条为止：从中间某条重新生成时，后面的旧消息属于另一条分支
+  const shown = streaming
+    ? view.messages.slice(0, view.messages.findIndex((m) => m.id === streaming.parentId) + 1)
+    : view.messages;
   const effort = reasoningEffort(provider.baseUrl, provider.thinking ?? "default");
 
   return (
@@ -365,7 +392,7 @@ export function App() {
         {error && <div className="error">{error}</div>}
         {!chatId && <p className="hint center">{t("chat.empty")}</p>}
         <div className="messages">
-          {view.messages.map((m) => {
+          {shown.map((m) => {
             const siblings = view.siblings.get(m.id) ?? [m];
             const index = siblings.findIndex((s) => s.id === m.id);
             const usage = m.usage as Usage | undefined;
@@ -394,14 +421,40 @@ export function App() {
                       </button>
                     </span>
                   )}
-                  {m.id === lastId &&
-                    m.role === "assistant" &&
-                    m.parentId !== null &&
-                    !streaming && (
-                      <button type="button" className="link" onClick={() => onRegenerate(m)}>
-                        {t("chat.regenerate")}
+                  {!streaming && editing?.id !== m.id && (
+                    <span className="actions-inline">
+                      {m.role === "assistant" && m.parentId !== null && (
+                        <button type="button" className="link" onClick={() => onRegenerate(m)}>
+                          {t("chat.regenerate")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="link"
+                        onClick={() => setEditing({ id: m.id, text: m.content })}
+                      >
+                        {t("chat.edit")}
                       </button>
-                    )}
+                      {deleting === m.id ? (
+                        <>
+                          <button type="button" className="link danger" onClick={() => onDelete(m)}>
+                            {t("chat.confirmDelete")}
+                          </button>
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => setDeleting(undefined)}
+                          >
+                            {t("chat.cancel")}
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" className="link" onClick={() => setDeleting(m.id)}>
+                          {t("chat.delete")}
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </div>
                 {typeof m.reasoning === "string" && m.reasoning && (
                   <details className="reasoning">
@@ -409,7 +462,30 @@ export function App() {
                     <div className="content">{m.reasoning}</div>
                   </details>
                 )}
-                <div className="content">{m.content}</div>
+                {editing?.id === m.id ? (
+                  <form
+                    className="editor"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      onSaveEdit();
+                    }}
+                  >
+                    <textarea
+                      value={editing.text}
+                      onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
+                    />
+                    <div className="actions">
+                      <button type="submit" className="button">
+                        {t("chat.save")}
+                      </button>
+                      <button type="button" className="link" onClick={() => setEditing(undefined)}>
+                        {t("chat.cancel")}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="content">{m.content}</div>
+                )}
                 {usage && (
                   <div className="usage">
                     {t("chat.usage", {

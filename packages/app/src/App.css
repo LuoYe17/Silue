@@ -262,3 +262,34 @@ ul {
   border-radius: 6px;
   padding: 4px 6px;
 }
+
+.actions-inline {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.link.danger {
+  color: var(--error-text);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.editor textarea {
+  min-height: 120px;
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  background: var(--pane);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.editor .actions {
+  align-items: center;
+}

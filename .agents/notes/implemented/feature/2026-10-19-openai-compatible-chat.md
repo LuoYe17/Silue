@@ -64,7 +64,7 @@ Status: implemented
 - 请求从 Rust 端发：`tauri-plugin-http` 2.8.3，前端用 `@tauri-apps/plugin-http` 的 `fetch`，不受 WebView 跨域和 CSP 限制。权限 `http:default` 放开 `https://*` 和 `http://*`，因为接口地址是用户自己填的。
 - API Key 存在系统凭据管理器：Rust 端用 `keyring` 4.2.0 的经典接口（`Entry::new(service, name)`），加了两个命令 `secret_get`、`secret_set`（空字符串表示删除），服务名是 `io.github.luoye17.silue`，Key 的名字是 `provider.apiKey`。
 - 接口地址和模型名存在数据库的 `settings` 集合（id `provider`），以后跟着同步；API Key 不同步。
-- `packages/app/src/provider.ts` 的 `streamChat` 发请求、边收边解析、逐个回调事件。`App.tsx` 里发消息后自动生成回复，回复挂在用户消息下面；「重新生成」在同一个父消息下再生成一条，成为兄弟（左右切换）。生成中可以停止。停止或出错时，已经收到的文字照样存成一条消息，不丢。
+- `packages/app/src/provider.ts` 的 `streamChat` 发请求、边收边解析、逐个回调事件。`App.tsx` 里发消息后自动生成回复，回复挂在用户消息下面；「重新生成」在同一个父消息下再生成一条，成为兄弟（左右切换）；任何一条 AI 回复（开场白除外）都能重新生成，等于从那里分支出去，生成中界面只显示到它的父消息为止，原来后面的消息留在旧分支里。每条消息能原地编辑（`editMessage`），删除要点两次确认，删掉的是这条和后面整条分支（`deleteBranch`）。生成中可以停止。停止或出错时，已经收到的文字照样存成一条消息，不丢。
 - 生成的消息额外存 `model`、`usage`（有就存）、`reasoning`（有就存），界面在回复下面显示输入、缓存命中、输出的 token 数。
 - 思考过程用 `<details>` 显示在正文上面，默认折叠（[思考深度](../../proposed/feature/2026-10-19-thinking-depth-levels.md) 的要求）。生成中还没出正文时，标题显示「等待模型回复… N 秒」；已经收到思考内容时显示「思考中… N 秒」。拼提示词时只用 `content`，不把上一轮的思考内容发回给模型。
 
